@@ -1,7 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
-public class MySimpleServer {
+public class Server {
     public static void main(String args[]) {
         boolean run = true;
         try {

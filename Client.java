@@ -1,9 +1,10 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
-public class MySimpleClient {
+public class Client {
     public static void main(String args[]) {
         try {
+
             Socket server = new Socket("iaxp16.inf.uni-jena.de", 1234);
             InputStream in = server.getInputStream();
             OutputStream out = server.getOutputStream();
@@ -13,8 +14,7 @@ public class MySimpleClient {
             DataOutputStream dout = new DataOutputStream(out);
             dout.writeUTF("Hello!");
 
-
-            //....
+//....
             ObjectOutputStream oout = new ObjectOutputStream(out);
             oout.writeObject(new java.util.Date()); oout.flush();
             server.close();
