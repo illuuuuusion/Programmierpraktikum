@@ -1,0 +1,121 @@
+@startuml
+skinparam packageStyle rectangle
+
+package "server" {
+  class ChatServerMain {
+    +main(String[] args)
+  }
+
+  class ChatServer {
+    - ServerSocket serverSocket
+    - Map<String,User> registeredUsers
+    - Map<String,ClientHandler> loggedInClients
+    - boolean running
+
+    + start(int port)
+    + stop()
+    + acceptClients()
+    + registerUser(String username, String password): boolean
+    + loginUser(String username, String password, ClientHandler handler): boolean
+    + logoutUser(User user)
+    + broadcastChat(String from, String text)
+    + broadcastSystem(String text)
+    + getLoggedInUsers(): Collection<User>
+  }
+
+  class ClientHandler {
+    - Socket socket
+    - DataInputStream in
+    - DataOutputStream out
+    - ChatServer server
+    - User user
+    - boolean running
+
+    + ClientHandler(Socket socket, ChatServer server)
+    + run()
+    + handleCommand(String line)
+    + handleRegister(String username, String password)
+    + handleLogin(String username, String password)
+    + handleChat(String text)
+    + send(String protocolMessage)
+    + closeConnection()
+  }
+
+  class User {
+    - String username
+    - String password
+    + User(String username, String password)
+    + getUsername(): String
+    + checkPassword(String pw): boolean
+  }
+}
+
+package "client" {
+  class ChatClientMain {
+    +main(String[] args)
+  }
+
+  class ChatClient {
+    - Socket socket
+    - DataInputStream in
+    - DataOutputStream out
+    - ServerListener listener
+    - String username
+    - boolean loggedIn
+    - boolean running
+
+    + connect(String host, int port)
+    + login(String username, String password)
+    + register(String username, String password)
+    + sendChat(String text)
+    + startListening()
+    + handleUserInputLoop()
+    + disconnect()
+    + handleServerMessage(String line)
+  }
+
+  class ServerListener {
+    - DataInputStream in
+    - ChatClient client
+    - boolean running
+
+    + ServerListener(DataInputStream in, ChatClient client)
+    + run()
+    + handleLine(String line)
+  }
+}
+
+' JDK / Infrastruktur
+class Socket <<JDK>>
+class ServerSocket <<JDK>>
+class DataInputStream <<JDK>>
+class DataOutputStream <<JDK>>
+
+' --- Beziehungen SERVER-SEITE ---
+ChatServerMain -> ChatServer : creates\nstart(port)
+ChatServer "1" o- "many" ClientHandler : manages\nloggedInClients
+ChatServer "1" o- "many" User : registeredUsers
+
+ClientHandler --> ChatServer : calls\nregisterUser(), loginUser(),\nlogoutUser(), broadcastChat(),\ngetLoggedInUsers()
+ClientHandler --> User : logged-in\nuser
+
+ChatServer --> ServerSocket : uses\nacceptClients()
+ClientHandler --> Socket : uses\nrun(), closeConnection()
+
+' --- Beziehungen CLIENT-SEITE ---
+ChatClientMain -> ChatClient : creates\nconnect(), login(), ...
+ChatClient --> ServerListener : creates\nstartListening()
+ServerListener --> ChatClient : callbacks\nhandleServerMessage()
+
+' Streams über Socket
+ChatClient --> Socket : via connect()
+Socket --> DataInputStream
+Socket --> DataOutputStream
+
+ChatClient --> DataInputStream : in
+ChatClient --> DataOutputStream : out
+
+ClientHandler --> DataInputStream : in
+ClientHandler --> DataOutputStream : out
+
+@enduml
