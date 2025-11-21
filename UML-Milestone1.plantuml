@@ -1,6 +1,6 @@
 @startuml
 skinparam packageStyle rectangle
-
+' Muss noch erneuert werden
 package "server" {
   class ChatServerMain {
     +main(String[] args)

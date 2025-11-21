@@ -61,7 +61,7 @@ public class ChatClient {
     }
 
     /**
-     * Liest Nachrichten vom Server und gibt sie hübsch formatiert auf der Konsole aus.
+     * Liest Nachrichten vom Server und gibt sies formatiert auf der Konsole aus.
      */
     private void listenToServer() {
         System.out.println("[CLIENT] ServerListener gestartet.");
@@ -181,7 +181,7 @@ public class ChatClient {
     }
 
     /**
-     * Liest Eingaben von der Konsole und schickt passende Kommandos an den Server.
+     * Liest Eingaben von der Konsole und schickt Kommandos an den Server.
      */
     private void readConsoleInput() {
         System.out.println("""
