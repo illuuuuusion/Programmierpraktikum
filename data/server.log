@@ -1,0 +1,29 @@
+2026-01-02 14:42:23 [INFO] Config: port=5001 users.file=data/users.db log.file=data/server.log
+2026-01-02 14:42:23 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-02 14:42:23 [INFO] Warte auf eingehende Clients ...
+2026-01-02 14:42:51 [INFO] CONNECT id=1 addr=/127.0.0.1:56268
+2026-01-02 14:43:06 [INFO] DISCONNECT client-ClientHandler-1 (active=0)
+2026-01-02 14:43:08 [INFO] CONNECT id=2 addr=/127.0.0.1:56270
+2026-01-02 14:43:19 [INFO] DISCONNECT client-ClientHandler-2 (active=0)
+2026-01-02 14:43:21 [INFO] CONNECT id=3 addr=/127.0.0.1:56271
+2026-01-02 14:43:31 [INFO] REGISTER user=123 ok=true
+2026-01-02 14:43:33 [INFO] DISCONNECT client-ClientHandler-3 (active=0)
+2026-01-02 14:43:34 [INFO] CONNECT id=4 addr=/127.0.0.1:56272
+2026-01-02 14:43:38 [INFO] REGISTER user=123 ok=false
+2026-01-02 14:43:53 [INFO] LOGIN_OK user=123
+2026-01-02 14:43:59 [INFO] ROOM_CREATE room1
+2026-01-02 14:43:59 [INFO] CREATE_ROOM by=123 room=room1 ok=true
+2026-01-02 14:58:33 [INFO] LOGOUT user=123
+2026-01-02 14:58:33 [INFO] DISCONNECT 123 (active=0)
+2026-01-02 15:08:21 [INFO] Config: port=5001 users.file=data/users.db log.file=data/server.log
+2026-01-02 15:08:21 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-02 15:08:21 [INFO] Warte auf eingehende Clients ...
+2026-01-02 15:08:38 [INFO] CONNECT id=1 addr=/127.0.0.1:56325
+2026-01-02 15:09:05 [INFO] REGISTER user=alice ok=true
+2026-01-02 15:09:11 [INFO] LOGIN_OK user=alice
+2026-01-02 15:09:19 [INFO] LEAVE user=alice room=Lobby
+2026-01-02 15:09:26 [INFO] JOIN user=alice room=Lobby ok=true
+2026-01-02 15:09:38 [INFO] ROOM_CREATE room1
+2026-01-02 15:09:38 [INFO] CREATE_ROOM by=alice room=room1 ok=true
+2026-01-02 15:09:45 [INFO] JOIN user=alice room=room1 ok=true
+2026-01-02 15:09:48 [INFO] MSG room=room1 from=alice len=2

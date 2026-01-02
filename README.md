@@ -13,8 +13,7 @@ Es erfüllt die Anforderungen des 1. Meilensteins:
 - Broadcast von Chat-Nachrichten
 - Benachrichtigungen beim Beitreten/Verlassen von Benutzern
 - reine Konsoleninteraktion (kein GUI)
-
----
+````
 
 ## 1. Projektstruktur
 
@@ -35,7 +34,7 @@ src/
     │       └─ User.java
     └─ resources/
         └─ chatroom.properties
-````
+```
 
 **Wichtige Klassen in Kürze:**
 
@@ -281,7 +280,8 @@ Dadurch entstehen:
 
 ### 5.2 Start über Terminal (mit Jar)
 
-**Server starten:**
+**Server starten:** 
+mvn clean compile
 
 ```bash
 java -cp target/fpp-chatroom-1.0-SNAPSHOT.jar de.uni_jena.fpp.chatroom.ChatServerMain
@@ -396,5 +396,4 @@ Mögliche Erweiterungen für weitere Meilensteine:
 * Erweiterte Protokollstruktur (z. B. Objektserialisierung)
 
 ---
-```
-```
+

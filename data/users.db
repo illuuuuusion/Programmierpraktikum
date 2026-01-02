@@ -1,0 +1,3 @@
+# username;iterations;saltBase64;hashBase64;banned
+123;120000;VQk/G8O06nys5EuBddVgBw==;MLLJrBU03HNico/ZNoKyQnwURIX69fG0b05LHeLg2Bc=;false
+alice;120000;VEZAeYiotV45V0VzD3irWQ==;oR74OlFwnHklGj6gqhLJ/YkfTLk4Bb80Q/eyXIudgM8=;false

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ChatClient {
 
@@ -20,296 +21,294 @@ public class ChatClient {
 
     private volatile boolean running = true;
 
+    // Model + Listener
+    private final ClientModel model = new ClientModel();
+    private final CopyOnWriteArrayList<ChatClientListener> listeners = new CopyOnWriteArrayList<>();
+
     public ChatClient(String host, int port) {
         this.host = host;
         this.port = port;
     }
 
-    /**
-     * Startet den Client:
-     * - baut Verbindung zum Server auf
-     * - startet Listener-Thread für Server-Nachrichten
-     * - liest Konsoleneingaben und sendet Kommandos an den Server
-     */
+    public ClientModel getModel() {
+        return model;
+    }
+
+    public void addListener(ChatClientListener l) {
+        if (l != null) listeners.add(l);
+    }
+
+    public void removeListener(ChatClientListener l) {
+        listeners.remove(l);
+    }
+
+    // Connection API (für GUI)
+    public void connect() throws IOException {
+        socket = new Socket(host, port);
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+
+        running = true;
+        Thread listener = new Thread(this::listenToServer, "ServerListener");
+        listener.start();
+
+        fireInfo("Verbunden mit " + host + ":" + port);
+    }
+
+    public void disconnect() {
+        running = false;
+        try { if (socket != null) socket.close(); } catch (IOException ignore) {}
+        fireConnectionClosed();
+    }
+
+    // Actions (für UI)
+    public void register(String username, String password) throws IOException {
+        send(Protocol.buildRegister(username, password));
+    }
+
+    public void login(String username, String password) throws IOException {
+        send(Protocol.buildLogin(username, password));
+    }
+
+    public void createRoom(String name) throws IOException {
+        send(Protocol.buildCreateRoom(name));
+    }
+
+    public void join(String room) throws IOException {
+        // damit UI sofort currentRoom kennt
+        model.setCurrentRoom(room);
+        send(Protocol.buildJoin(room));
+    }
+
+    public void leave() throws IOException {
+        model.setCurrentRoom(null);
+        send(Protocol.buildLeave());
+    }
+
+    public void sendMessage(String text) throws IOException {
+        send(Protocol.buildMsg(text));
+    }
+
+    public void logout() throws IOException {
+        send(Protocol.buildLogout());
+    }
+
+    // Debug-Konsole bleibt (start())
     public void start() {
         try {
-            socket = new Socket(host, port);
-            System.out.println("[CLIENT] Verbunden mit " + host + ":" + port);
-
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
-
-            // Thread: hört auf Nachrichten vom Server
-            Thread listenerThread = new Thread(this::listenToServer, "ServerListener");
-            listenerThread.start();
-
-            // Hauptthread: verarbeitet Konsoleneingaben
+            connect();
             readConsoleInput();
-
-            // Wenn wir aus der Konsolenschleife raus sind:
-            running = false;
-            try {
-                listenerThread.join();
-            } catch (InterruptedException ignore) {
-            }
-
-        } catch (IOException e) {
-            System.err.println("[CLIENT] Fehler beim Verbinden: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("[CLIENT] Fehler: " + e.getMessage());
+            fireError(e.getMessage());
         } finally {
-            cleanup();
+            disconnect();
         }
     }
 
-    /**
-     * Liest Nachrichten vom Server und gibt sies formatiert auf der Konsole aus.
-     */
     private void listenToServer() {
-        System.out.println("[CLIENT] ServerListener gestartet.");
         try {
-            while (running && !socket.isClosed()) {
+            while (running && socket != null && !socket.isClosed()) {
                 String line;
                 try {
-                    line = in.readUTF(); // blockiert, bis etwas kommt
+                    line = in.readUTF();
                 } catch (EOFException eof) {
-                    System.out.println("[CLIENT] Verbindung vom Server geschlossen (EOF).");
+                    fireInfo("Server hat Verbindung geschlossen.");
                     break;
                 }
 
-                if (line == null) {
-                    System.out.println("[CLIENT] null vom Server gelesen – beende Listener.");
-                    break;
-                }
-
+                if (line == null) break;
                 handleServerMessage(line);
             }
         } catch (IOException e) {
             if (running) {
-                System.err.println("[CLIENT] Fehler beim Lesen vom Server: " + e.getMessage());
+                fireError("Lesen fehlgeschlagen: " + e.getMessage());
             }
         } finally {
             running = false;
-            System.out.println("[CLIENT] ServerListener beendet.");
+            fireConnectionClosed();
         }
     }
 
-    /**
-     * Verarbeitet eine einzelne Nachricht vom Server anhand des Protokolls.
-     */
     private void handleServerMessage(String line) {
-        String[] tokens = Protocol.splitTokens(line);
-        if (tokens.length == 0) {
-            System.out.println("[SERVER] (leer)");
-            return;
+        // CHAT <room> <from> <text...> (4 tokens) :contentReference[oaicite:2]{index=2}
+        if (line.startsWith(Protocol.RES_CHAT + " ")) {
+            String[] t = line.split("\\s+", 4);
+            if (t.length >= 4) {
+                String room = t[1];
+                String from = t[2];
+                String text = t[3];
+
+                model.addChatLine("[" + room + "][" + from + "] " + text);
+                fireChat(room, from, text);
+                return;
+            }
         }
 
-        String cmd = tokens[0];
+        String[] tokens = Protocol.splitTokens(line);
+        if (tokens.length == 0) return;
 
-        switch (cmd) {
-            case Protocol.RES_CHAT -> {
-                // CHAT <from> <text>
-                if (tokens.length < 3) {
-                    System.out.println("[SERVER] CHAT (ungültig): " + line);
-                    return;
+        switch (tokens[0]) {
+
+            case Protocol.RES_ROOM_LIST -> {
+                List<String> rooms = (tokens.length >= 2)
+                        ? Protocol.parsePipeList(tokens[1])
+                        : List.of();
+                model.setRooms(rooms);
+                fireRoomsUpdated(model.getRooms());
+            }
+
+            case Protocol.RES_ROOM_USERS -> {
+                if (tokens.length < 2) return;
+                String room = tokens[1];
+                List<String> users = (tokens.length >= 3)
+                        ? Protocol.parsePipeList(tokens[2])
+                        : List.of();
+
+                // Aktualisiere nur die Userliste des aktuellen Raums
+                String cur = model.getCurrentRoom();
+                if (cur != null && cur.equals(room)) {
+                    model.setUsersInCurrentRoom(users);
                 }
-                String from = tokens[1];
-                String text = tokens[2];
-                System.out.println("[" + from + "] " + text);
+                fireUsersUpdated(room, users);
             }
 
-            case Protocol.RES_USER_LIST -> {
-                // USER_LIST user1,user2,...
-                if (tokens.length < 2) {
-                    System.out.println("[SERVER] USER_LIST (leer)");
-                    return;
-                }
-                List<String> users = Protocol.parseUserList(tokens[1]);
-                System.out.println("[INFO] Angemeldete Benutzer: " + String.join(", ", users));
+            case Protocol.RES_WARN -> {
+                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                model.addChatLine("[WARN] " + txt);
+                fireWarn(txt);
             }
 
-            case Protocol.RES_USER_JOINED -> {
-                // USER_JOINED <username>
-                if (tokens.length < 2) {
-                    System.out.println("[SERVER] USER_JOINED (ungültig): " + line);
-                    return;
-                }
-                String username = tokens[1];
-                System.out.println("[INFO] " + username + " hat den Chat betreten.");
-            }
-
-            case Protocol.RES_USER_LEFT -> {
-                // USER_LEFT <username>
-                if (tokens.length < 2) {
-                    System.out.println("[SERVER] USER_LEFT (ungültig): " + line);
-                    return;
-                }
-                String username = tokens[1];
-                System.out.println("[INFO] " + username + " hat den Chat verlassen.");
-            }
-
-            case Protocol.RES_LOGIN_OK -> {
-                System.out.println("[INFO] Login erfolgreich.");
-            }
-
-            case Protocol.RES_LOGIN_FAILED -> {
-                String reason = (tokens.length >= 2) ? tokens[1] : "Unbekannter Grund";
-                System.out.println("[WARN] Login fehlgeschlagen: " + reason);
-            }
-
-            case Protocol.RES_REGISTER_OK -> {
-                System.out.println("[INFO] Registrierung erfolgreich. Du kannst dich jetzt einloggen.");
-            }
-
-            case Protocol.RES_REGISTER_FAILED -> {
-                String reason = (tokens.length >= 2) ? tokens[1] : "Unbekannter Grund";
-                System.out.println("[WARN] Registrierung fehlgeschlagen: " + reason);
+            case Protocol.RES_BANNED -> {
+                String reason = (tokens.length >= 2) ? tokens[1] : "";
+                model.addChatLine("[BANNED] " + reason);
+                fireBanned(reason);
+                disconnect();
             }
 
             case Protocol.RES_INFO -> {
-                String msg = (tokens.length >= 2) ? tokens[1] : "";
-                System.out.println("[INFO] " + msg);
+                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                model.addChatLine("[INFO] " + txt);
+                fireInfo(txt);
             }
 
             case Protocol.RES_ERROR -> {
-                String msg = (tokens.length >= 2) ? tokens[1] : "";
-                System.out.println("[ERROR] " + msg);
+                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                model.addChatLine("[ERROR] " + txt);
+                fireError(txt);
             }
 
             default -> {
-                System.out.println("[SERVER] " + line);
+                // Für Debug: unbekannte Servermessage anzeigen
+                model.addChatLine("[SERVER] " + line);
+                fireInfo(line);
             }
         }
     }
 
-    /**
-     * Liest Eingaben von der Konsole und schickt Kommandos an den Server.
-     */
-    private void readConsoleInput() {
+    private void readConsoleInput() throws IOException {
         System.out.println("""
-                [CLIENT] Eingabe bereit.
                 Befehle:
-                  /register <username> <password>
-                  /login <username> <password>
-                  /who
+                  /register <u> <p>
+                  /login <u> <p>
+                  /create <room>
+                  /join <room>
+                  /leave
                   /msg <text>
                   /logout
-                  /quit   (Client beenden)
-                Normale Eingabe ohne '/' wird als Chat-Nachricht gesendet.
+                  /quit
                 """);
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
-            while (running) {
-                String line = reader.readLine();
-                if (line == null) {
-                    break; // EOF auf System.in
-                }
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        while (running) {
+            String line = br.readLine();
+            if (line == null) break;
 
-                line = line.trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
+            line = line.trim();
+            if (line.isEmpty()) continue;
 
-                // Client-internes Kommando?
-                if (line.startsWith("/")) {
-                    boolean stayRunning = handleConsoleCommand(line);
-                    if (!stayRunning) {
-                        break;
-                    }
-                } else {
-                    // Normale Nachricht -> MSG
-                    send(Protocol.buildMsg(line));
-                }
+            if (line.startsWith("/")) {
+                if (!handleConsoleCommand(line)) break;
+            } else {
+                sendMessage(line);
             }
-        } catch (IOException e) {
-            System.err.println("[CLIENT] Fehler beim Lesen von der Konsole: " + e.getMessage());
         }
-
-        System.out.println("[CLIENT] Konsole beendet.");
     }
 
-    /**
-     * Verarbeitet Befehle, die mit '/' beginnen.
-     * @return false, wenn der Client beendet werden soll (/quit)
-     */
     private boolean handleConsoleCommand(String line) throws IOException {
         String[] parts = line.split("\\s+", 3);
         String cmd = parts[0];
 
         switch (cmd) {
             case "/register" -> {
-                if (parts.length < 3) {
-                    System.out.println("Usage: /register <username> <password>");
-                    return true;
-                }
-                String username = parts[1];
-                String password = parts[2];
-                send(Protocol.buildRegister(username, password));
+                if (parts.length < 3) { System.out.println("Usage: /register <u> <p>"); return true; }
+                register(parts[1], parts[2]);
             }
-
             case "/login" -> {
-                if (parts.length < 3) {
-                    System.out.println("Usage: /login <username> <password>");
-                    return true;
-                }
-                String username = parts[1];
-                String password = parts[2];
-                send(Protocol.buildLogin(username, password));
+                if (parts.length < 3) { System.out.println("Usage: /login <u> <p>"); return true; }
+                login(parts[1], parts[2]);
             }
-
-            case "/who" -> {
-                send(Protocol.buildWho());
+            case "/create" -> {
+                if (parts.length < 2) { System.out.println("Usage: /create <room>"); return true; }
+                createRoom(parts[1]);
             }
-
+            case "/join" -> {
+                if (parts.length < 2) { System.out.println("Usage: /join <room>"); return true; }
+                join(parts[1]);
+            }
+            case "/leave" -> leave();
             case "/msg" -> {
-                if (parts.length < 2) {
-                    System.out.println("Usage: /msg <text>");
-                    return true;
-                }
+                if (parts.length < 2) { System.out.println("Usage: /msg <text>"); return true; }
                 String text = (parts.length == 2) ? parts[1] : parts[1] + " " + parts[2];
-                send(Protocol.buildMsg(text));
+                sendMessage(text);
             }
-
-            case "/logout" -> {
-                send(Protocol.buildLogout());
-            }
-
+            case "/logout" -> logout();
             case "/quit" -> {
-                // Versuchen, einen Logout zu schicken, dann beendet sich der Client
-                try {
-                    send(Protocol.buildLogout());
-                } catch (IOException ignore) {
-                }
+                try { logout(); } catch (IOException ignore) {}
                 running = false;
                 return false;
             }
-
-            default -> {
-                System.out.println("Unbekannter Befehl: " + cmd);
-            }
+            default -> System.out.println("Unbekannt: " + cmd);
         }
-
         return true;
     }
 
-    /**
-     * Schickt eine Protokollnachricht an den Server.
-     */
-    private synchronized void send(String message) throws IOException {
-        if (out == null) {
-            System.err.println("[CLIENT] Noch keine Verbindung zum Server.");
-            return;
-        }
-        out.writeUTF(message);
+    private synchronized void send(String msg) throws IOException {
+        if (out == null) throw new IOException("Not connected");
+        out.writeUTF(msg);
         out.flush();
     }
 
-    private void cleanup() {
-        running = false;
-        if (socket != null && !socket.isClosed()) {
-            try {
-                socket.close();
-            } catch (IOException ignore) {
-            }
-        }
-        System.out.println("[CLIENT] Verbindung geschlossen.");
+    // Listener helper
+    private void fireRoomsUpdated(List<String> rooms) {
+        for (ChatClientListener l : listeners) l.onRoomsUpdated(rooms);
+    }
+
+    private void fireUsersUpdated(String room, List<String> users) {
+        for (ChatClientListener l : listeners) l.onUsersUpdated(room, users);
+    }
+
+    private void fireChat(String room, String from, String text) {
+        for (ChatClientListener l : listeners) l.onChatMessage(room, from, text);
+    }
+
+    private void fireInfo(String text) {
+        for (ChatClientListener l : listeners) l.onInfo(text);
+    }
+
+    private void fireError(String text) {
+        for (ChatClientListener l : listeners) l.onError(text);
+    }
+
+    private void fireWarn(String text) {
+        for (ChatClientListener l : listeners) l.onWarn(text);
+    }
+
+    private void fireBanned(String reason) {
+        for (ChatClientListener l : listeners) l.onBanned(reason);
+    }
+
+    private void fireConnectionClosed() {
+        for (ChatClientListener l : listeners) l.onConnectionClosed();
     }
 }

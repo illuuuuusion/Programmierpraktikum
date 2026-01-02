@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,220 +12,339 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ChatServer {
 
-    private final int port;
-    private volatile boolean running;
+    public static final String DEFAULT_ROOM = "Lobby";
 
+    private final int port;
+    private final UserRepository userRepo;
+
+    private volatile boolean running;
     private ServerSocket serverSocket;
 
-    // Thread-sichere Liste aller verbundenen ClientHandler (Verbindungen)
-    private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
-
-    // Benutzerverwaltung
-    // registrierte User (überleben nur solange der Server läuft)
-    private final Map<String, User> registeredUsers = new ConcurrentHashMap<>();
-    // aktuell eingeloggte User -> zugehöriger ClientHandler
+    private final List<ClientHandler> connections = new CopyOnWriteArrayList<>();
     private final Map<String, ClientHandler> loggedInClients = new ConcurrentHashMap<>();
 
-    private int nextClientId = 1;
+    private final Map<String, Room> rooms = new ConcurrentHashMap<>();
 
-    public ChatServer(int port) {
+    private int nextClientId = 1;
+    private final ServerLogger logger;
+
+    public ChatServer(int port, UserRepository userRepo, ServerLogger logger) {
         this.port = port;
+        this.userRepo = userRepo;
+        this.logger = logger;
+        rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM));
     }
 
-    /**
-     * Multi-Client-Server:
-     * - Öffnet einen ServerSocket
-     * - Nimmt in einer Schleife neue Verbindungen an
-     * - Startet für jeden Client einen ClientHandler-Thread
-     */
     public void start() {
+        logger.info("Server startet (Multi-Client) auf Port " + port);
         System.out.println("[SERVER] Starte ChatServer (Multi-Client) auf Port " + port);
+
         running = true;
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            this.serverSocket = serverSocket;
+        try (ServerSocket ss = new ServerSocket(port)) {
+            this.serverSocket = ss;
+
+            logger.info("Warte auf eingehende Clients ...");
             System.out.println("[SERVER] Warte auf eingehende Clients ...");
 
             while (running) {
-                try {
-                    Socket clientSocket = serverSocket.accept();
-                    int clientId = nextClientId++;
-                    System.out.println("[SERVER] Neuer Client (" + clientId + ") von " + clientSocket.getRemoteSocketAddress());
+                Socket clientSocket = ss.accept();
+                int id = nextClientId++;
 
-                    ClientHandler handler = new ClientHandler(this, clientSocket, clientId);
-                    addClient(handler);
-                    handler.start();
+                logger.info("CONNECT id=" + id + " addr=" + clientSocket.getRemoteSocketAddress());
 
-                } catch (IOException e) {
-                    if (running) {
-                        System.err.println("[SERVER] Fehler beim Accept: " + e.getMessage());
-                    } else {
-                        System.out.println("[SERVER] Accept unterbrochen, Server wird beendet.");
-                    }
-                }
+                ClientHandler handler = new ClientHandler(this, clientSocket, id);
+                connections.add(handler);
+                handler.start();
+
+                System.out.println("[SERVER] Verbindung angenommen (" + id + "): " + clientSocket.getRemoteSocketAddress());
             }
 
         } catch (IOException e) {
-            System.err.println("[SERVER] Konnte ServerSocket nicht öffnen: " + e.getMessage());
-            e.printStackTrace();
+            if (running) {
+                logger.error("ServerSocket Fehler: " + e.getMessage());
+                System.err.println("[SERVER] ServerSocket Fehler: " + e.getMessage());
+                e.printStackTrace();
+            } else {
+                // passiert häufig beim Stop(), wenn serverSocket.close() accept() unterbricht
+                logger.info("ServerSocket geschlossen (stop).");
+            }
         } finally {
             running = false;
+            logger.info("Server beendet.");
             System.out.println("[SERVER] Server beendet.");
+
+            // Logger schließen (Datei-Handle freigeben)
+            try {
+                logger.close();
+            } catch (Exception ignore) {}
         }
     }
+
 
     public void stop() {
         running = false;
-        System.out.println("[SERVER] Stop-Signal gesetzt.");
+        logger.info("Stop requested");
 
         try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close(); // unterbricht accept()
-            }
+            if (serverSocket != null) serverSocket.close();
         } catch (IOException e) {
-            System.err.println("[SERVER] Fehler beim Schließen des ServerSocket: " + e.getMessage());
-        }
-
-        for (ClientHandler ch : clients) {
-            ch.interrupt();
+            logger.error("Fehler beim Schließen des ServerSocket: " + e.getMessage());
         }
     }
 
-    public void addClient(ClientHandler handler) {
-        clients.add(handler);
-        System.out.println("[SERVER] Client hinzugefügt. Aktive Verbindungen: " + clients.size());
-    }
+    // ===== Schritt 2.3: Persistente Userverwaltung =====
 
-    /**
-     * Wird von ClientHandler aufgerufen, wenn eine Verbindung endet.
-     * Entfernt den Client aus der Verbindungs- und Login-Liste
-     * und informiert ggf. andere Clients.
-     */
-    public void removeClient(ClientHandler handler) {
-        clients.remove(handler);
-
-        User user = handler.getUser();
-        if (user != null) {
-            String username = user.getUsername();
-            loggedInClients.remove(username);
-            broadcastUserLeft(username);
-        }
-
-        System.out.println("[SERVER] Client entfernt. Aktive Verbindungen: " + clients.size());
-    }
-
-    /* ==================== Benutzerverwaltung ==================== */
-
-    /**
-     * Versucht, einen neuen User zu registrieren.
-     * @return true, wenn der Username neu war und registriert wurde.
-     */
     public boolean registerUser(String username, String password) {
-        if (username == null || username.isBlank() || password == null) {
-            return false;
+        if (!isValidSimpleName(username) || password == null) return false;
+        char[] pw = password.toCharArray();
+        try {
+            return userRepo.createUser(username, pw);
+        } finally {
+            java.util.Arrays.fill(pw, '\0');
         }
-        User user = new User(username, password);
-        User existing = registeredUsers.putIfAbsent(username, user);
-        return existing == null;
     }
 
     /**
-     * Prüft Benutzername+Passwort.
-     * @return User-Objekt bei Erfolg, sonst null.
+     * @return User record on success, otherwise null.
+     *         IMPORTANT: may return a banned user (user.isBanned()==true) if password matches.
      */
     public User authenticateUser(String username, String password) {
-        if (username == null || password == null) {
-            return null;
+        if (username == null || password == null) return null;
+        char[] pw = password.toCharArray();
+        try {
+            return userRepo.verifyLogin(username, pw);
+        } finally {
+            java.util.Arrays.fill(pw, '\0');
         }
-        User user = registeredUsers.get(username);
-        if (user == null) {
-            return null;
-        }
-        if (!user.getPassword().equals(password)) {
-            return null;
-        }
-        return user;
+    }
+
+    public List<User> listAllUsers() {
+        return userRepo.listUsers();
+    }
+
+    public boolean setUserBanned(String username, boolean banned) {
+        return userRepo.setBanned(username, banned);
     }
 
     public boolean isUserLoggedIn(String username) {
         return loggedInClients.containsKey(username);
+    }
+// ===== Schritt 2.4: Admin-Funktionen =====
+
+    /**
+     * Sends a warning to an ONLINE user.
+     * @return true if user was online and WARN was sent (best effort).
+     */
+    public boolean warnUser(String username, String text) {
+        if (username == null || username.isBlank()) return false;
+        logger.warn("WARN user=" + username + " text=" + text);
+
+        ClientHandler ch = loggedInClients.get(username);
+        if (ch == null) return false;
+
+        String msg = Protocol.buildWarn(text == null ? "" : text);
+
+        try {
+            ch.send(msg);
+            return true;
+        } catch (IOException e) {
+            System.err.println("[SERVER] WARN an " + username + " fehlgeschlagen: " + e.getMessage());
+            ch.closeNow(); // best effort cleanup
+            return false;
+        }
+    }
+
+    /**
+     * Permanently bans a user (persistent) and kicks them if online.
+     * @return true if the user existed in the repository and was persisted as banned.
+     */
+    public boolean banUser(String username, String reason) {
+        if (username == null || username.isBlank()) return false;
+        logger.warn("BAN user=" + username + " reason=" + reason);
+
+        boolean persisted = userRepo.setBanned(username, true);
+
+        ClientHandler ch = loggedInClients.get(username);
+        if (ch != null) {
+            try {
+                ch.send(Protocol.buildBanned(reason == null ? "" : reason));
+            } catch (IOException ignore) {
+                // ignore, we kick anyway
+            }
+            // optional: sofort aus online-Liste nehmen (cleanup macht's nochmal)
+            loggedInClients.remove(username);
+            ch.closeNow();
+        }
+
+        return persisted;
+    }
+
+    // für UI: Entbannen
+    public boolean unbanUser(String username) {
+        if (username == null || username.isBlank()) return false;
+        return userRepo.setBanned(username, false);
+    }
+
+    // für UI: Online-Usernamen
+    public List<String> getOnlineUsernames() {
+        List<String> list = new ArrayList<>(loggedInClients.keySet());
+        list.sort(String::compareToIgnoreCase);
+        return list;
     }
 
     public void addLoggedInClient(User user, ClientHandler handler) {
         loggedInClients.put(user.getUsername(), handler);
     }
 
-    public List<String> getLoggedInUsernames() {
-        return new ArrayList<>(loggedInClients.keySet());
+    public void removeClient(ClientHandler handler) {
+        connections.remove(handler);
+        String uname = (handler.getUser() != null) ? handler.getUser().getUsername() : ("client-" + handler.getName());
+        logger.info("DISCONNECT " + uname + " (active=" + connections.size() + ")");
+
+        if (handler.getUser() != null) {
+            forceLeaveRoom(handler);
+            loggedInClients.remove(handler.getUser().getUsername());
+        }
+
+        System.out.println("[SERVER] Verbindung entfernt. Aktive Verbindungen: " + connections.size());
     }
 
-    /* ==================== Broadcast-Funktionen ==================== */
+    // Rooms
 
-    /**
-     * Broadcastet eine Chat-Nachricht an alle eingeloggten Clients.
-     */
-    public void broadcastChat(String from, String text) {
-        String message = Protocol.buildChat(from, text);
-        System.out.println("[SERVER] Broadcast CHAT von " + from + ": " + text);
+    public List<String> getRoomNames() {
+        List<String> list = new ArrayList<>(rooms.keySet());
+        list.sort(String::compareToIgnoreCase);
+        return list;
+    }
 
-        for (ClientHandler ch : loggedInClients.values()) {
-            try {
-                ch.send(message);
-            } catch (IOException e) {
-                System.err.println("[SERVER] Fehler beim Senden an " + ch.getName() + ": " + e.getMessage());
+    public boolean createRoom(String roomName) {
+        if (!isValidRoomName(roomName)) return false;
+
+
+        Room existing = rooms.putIfAbsent(roomName, new Room(roomName));
+        if (existing == null) {
+            broadcastRoomListToAll();
+            logger.info("ROOM_CREATE " + roomName);
+            return true;
+
+        }
+        return false;
+    }
+
+    public boolean joinRoom(String roomName, ClientHandler handler) {
+        if (!isValidRoomName(roomName)) return false;
+
+        Room target = rooms.get(roomName);
+        if (target == null) return false;
+
+        leaveRoom(handler);
+
+        handler.setCurrentRoom(roomName);
+        target.addMember(handler);
+
+        broadcastRoomUsers(roomName);
+        return true;
+    }
+
+    public void leaveRoom(ClientHandler handler) {
+        String old = handler.getCurrentRoom();
+        if (old == null) return;
+
+        Room room = rooms.get(old);
+        handler.setCurrentRoom(null);
+
+        if (room != null) {
+            room.removeMember(handler);
+
+            broadcastRoomUsers(old);
+
+            if (room.isEmpty() && !DEFAULT_ROOM.equals(old)) {
+                rooms.remove(old);
+                broadcastRoomListToAll();
+                logger.info("ROOM_DELETE " + old);
+
             }
         }
     }
 
-    /**
-     * Info: Ein Benutzer ist neu beigetreten.
-     * except: dieser Handler bekommt die JOIN-Nachricht nicht (z.B. der frisch Eingeloggte selbst).
-     */
-    public void broadcastUserJoined(String username, ClientHandler except) {
-        String msg = Protocol.RES_USER_JOINED + " " + username;
-        System.out.println("[SERVER] USER_JOINED: " + username);
+    private void forceLeaveRoom(ClientHandler handler) {
+        leaveRoom(handler);
+    }
 
+    // Push Updates
+
+    public void sendRoomListTo(ClientHandler ch) {
+        try {
+            ch.send(Protocol.buildRoomList(getRoomNames()));
+        } catch (IOException e) {
+            System.err.println("[SERVER] ROOM_LIST an " + ch.getName() + " fehlgeschlagen: " + e.getMessage());
+        }
+    }
+
+    public void broadcastRoomListToAll() {
+        String msg = Protocol.buildRoomList(getRoomNames());
         for (ClientHandler ch : loggedInClients.values()) {
-            if (ch == except) {
-                continue;
-            }
             try {
                 ch.send(msg);
             } catch (IOException e) {
-                System.err.println("[SERVER] Fehler beim Senden USER_JOINED an " + ch.getName() + ": " + e.getMessage());
+                System.err.println("[SERVER] ROOM_LIST broadcast fehlgeschlagen: " + e.getMessage());
             }
         }
     }
 
-    /**
-     * Info: Ein Benutzer hat den Chat verlassen.
-     */
-    public void broadcastUserLeft(String username) {
-        String msg = Protocol.RES_USER_LEFT + " " + username;
-        System.out.println("[SERVER] USER_LEFT: " + username);
+    public void broadcastRoomUsers(String roomName) {
+        Room room = rooms.get(roomName);
+        if (room == null) return;
 
-        for (ClientHandler ch : loggedInClients.values()) {
+        String msg = Protocol.buildRoomUsers(roomName, room.getMemberNames());
+        for (ClientHandler member : room.getMembers()) {
             try {
-                ch.send(msg);
+                member.send(msg);
             } catch (IOException e) {
-                System.err.println("[SERVER] Fehler beim Senden USER_LEFT an " + ch.getName() + ": " + e.getMessage());
+                System.err.println("[SERVER] ROOM_USERS an " + member.getName() + " fehlgeschlagen: " + e.getMessage());
             }
         }
     }
 
-    /**
-     * Broadcastet eine allgemeine INFO-Nachricht an alle eingeloggten Clients.
-     */
-    public void broadcastInfo(String text) {
-        String msg = Protocol.RES_INFO + " " + text;
-        System.out.println("[SERVER] INFO-Broadcast: " + text);
+    // Chat in Room
 
-        for (ClientHandler ch : loggedInClients.values()) {
+    public void broadcastChatToRoom(String roomName, String from, String text) {
+        Room room = rooms.get(roomName);
+        if (room == null) return;
+
+        String msg = Protocol.buildChat(roomName, from, text);
+        for (ClientHandler member : room.getMembers()) {
             try {
-                ch.send(msg);
+                member.send(msg);
             } catch (IOException e) {
-                System.err.println("[SERVER] Fehler beim Senden INFO an " + ch.getName() + ": " + e.getMessage());
+                System.err.println("[SERVER] CHAT an " + member.getName() + " fehlgeschlagen: " + e.getMessage());
             }
         }
     }
+
+    // Validation Helpers
+
+    private boolean isValidRoomName(String s) {
+        if (!isValidSimpleName(s)) return false;
+        return !s.contains("|");
+    }
+
+    private boolean isValidSimpleName(String s) {
+        if (s == null) return false;
+        if (s.isBlank()) return false;
+        return !s.contains(" ");
+    }
+
+    public Map<String, Room> getRoomsUnsafe() {
+        return Collections.unmodifiableMap(rooms);
+    }
+
+    public void addLogListener(ServerLogListener l) { logger.addListener(l); }
+    public List<String> getLogHistory() { return logger.getHistorySnapshot(); }
+    public void logInfo(String msg) { logger.info(msg); }
+    public void logWarn(String msg) { logger.warn(msg); }
+    public void logError(String msg) { logger.error(msg); }
+
+
 }

@@ -5,7 +5,6 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.List;
 
 public class ClientHandler extends Thread {
 
@@ -16,9 +15,9 @@ public class ClientHandler extends Thread {
     private DataInputStream in;
     private DataOutputStream out;
 
-    // Benutzer-Infos
-    private User user;              // null, solange nicht eingeloggt
-    private String displayName;     // standardmäßig "client-<id>", nach Login = username
+    private User user;
+    private String displayName;
+    private String currentRoom;
 
     private volatile boolean running = true;
 
@@ -32,35 +31,30 @@ public class ClientHandler extends Thread {
 
     @Override
     public void run() {
-        System.out.println("[SERVER] " + getName() + " gestartet für " + socket.getRemoteSocketAddress());
+        System.out.println("[SERVER] " + getName() + " gestartet: " + socket.getRemoteSocketAddress());
+
         try {
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
 
             while (running && !socket.isClosed()) {
                 String line;
-
                 try {
-                    line = in.readUTF(); // blockiert bis Nachricht da ist
+                    line = in.readUTF();
                 } catch (EOFException eof) {
-                    System.out.println("[SERVER] " + getName() + " EOF – Client hat Verbindung beendet.");
                     break;
                 }
 
-                if (line == null) {
-                    System.out.println("[SERVER] " + getName() + " null gelesen – beende.");
-                    break;
-                }
-
-                System.out.println("[SERVER] (" + getName() + ") Empfangen: " + line);
+                if (line == null) break;
                 handleCommand(line);
             }
 
         } catch (IOException e) {
-            System.err.println("[SERVER] IO-Fehler in " + getName() + ": " + e.getMessage());
+            if (running) {
+                System.err.println("[SERVER] IO-Fehler " + getName() + ": " + e.getMessage());
+            }
         } finally {
             cleanup();
-            System.out.println("[SERVER] " + getName() + " beendet.");
         }
     }
 
@@ -75,37 +69,28 @@ public class ClientHandler extends Thread {
 
         switch (cmd) {
             case Protocol.CMD_REGISTER -> handleRegister(tokens);
-
             case Protocol.CMD_LOGIN -> handleLogin(tokens);
 
-            case Protocol.CMD_WHO -> handleWho();
+            case Protocol.CMD_CREATE_ROOM -> handleCreateRoom(tokens);
+            case Protocol.CMD_JOIN -> handleJoin(tokens);
+            case Protocol.CMD_LEAVE -> handleLeave();
 
-            case Protocol.CMD_MSG -> handleMsg(line, cmd);
-
+            case Protocol.CMD_MSG -> handleMsg(line);
             case Protocol.CMD_LOGOUT -> handleLogout();
 
             default -> send(Protocol.RES_ERROR + " Unbekanntes Kommando: " + cmd);
         }
     }
 
-    /* ==================== Einzelne Command-Handler ==================== */
-
     private void handleRegister(String[] tokens) throws IOException {
         if (tokens.length < 3) {
             send(Protocol.RES_ERROR + " Usage: REGISTER <username> <password>");
             return;
         }
-        String username = tokens[1];
-        String password = tokens[2];
+        boolean ok = server.registerUser(tokens[1], tokens[2]);
+        send(ok ? Protocol.RES_REGISTER_OK : (Protocol.RES_REGISTER_FAILED + " USERNAME_TAKEN"));
+        server.logInfo("REGISTER user=" + tokens[1] + " ok=" + ok);
 
-        boolean ok = server.registerUser(username, password);
-        if (ok) {
-            send(Protocol.RES_REGISTER_OK);
-            System.out.println("[SERVER] User registriert: " + username);
-        } else {
-            send(Protocol.RES_REGISTER_FAILED + " USERNAME_TAKEN");
-            System.out.println("[SERVER] Registrierung fehlgeschlagen, Username vergeben: " + username);
-        }
     }
 
     private void handleLogin(String[] tokens) throws IOException {
@@ -113,107 +98,155 @@ public class ClientHandler extends Thread {
             send(Protocol.RES_ERROR + " Usage: LOGIN <username> <password>");
             return;
         }
-        if (this.user != null) {
-            send(Protocol.RES_LOGIN_FAILED + " ALREADY_LOGGED_IN");
-            return;
-        }
-
         String username = tokens[1];
         String password = tokens[2];
 
+        if (this.user != null) {
+            send(Protocol.RES_LOGIN_FAILED + " ALREADY_LOGGED_IN");
+            server.logInfo("LOGIN_FAIL user=" + username);
+            return;
+        }
+
         if (server.isUserLoggedIn(username)) {
             send(Protocol.RES_LOGIN_FAILED + " ALREADY_LOGGED_IN");
+            server.logInfo("LOGIN_FAIL user=" + username);
             return;
         }
 
         User u = server.authenticateUser(username, password);
         if (u == null) {
             send(Protocol.RES_LOGIN_FAILED + " INVALID_CREDENTIALS");
+            server.logInfo("LOGIN_FAIL user=" + username);
             return;
         }
 
-        // Erfolg: Benutzer im Handler und im Server registrieren
+        if (u.isBanned()) {
+            send(Protocol.buildBanned("Du bist dauerhaft gebannt."));
+            server.logWarn("LOGIN_BANNED user=" + username);
+            running = false;
+            closeNow();
+            return;
+        }
+
         this.user = u;
         this.displayName = u.getUsername();
         server.addLoggedInClient(u, this);
 
         send(Protocol.RES_LOGIN_OK);
-        System.out.println("[SERVER] User eingeloggt: " + username + " (Client " + clientId + ")");
+        server.logInfo("LOGIN_OK user=" + username);
+        server.sendRoomListTo(this);
 
-        // aktuelle Userliste an diesen Client schicken
-        List<String> users = server.getLoggedInUsernames();
-        send(Protocol.buildUserList(users));
-
-        // Willkommensnachricht nur an diesen Client
-        send(Protocol.RES_INFO + " Willkommen, " + username + "!");
-
-        // andere Clients informieren
-        server.broadcastUserJoined(username, this);
+        boolean joined = server.joinRoom(ChatServer.DEFAULT_ROOM, this);
+        if (joined) {
+            send(Protocol.RES_INFO + " Joined " + ChatServer.DEFAULT_ROOM);
+        } else {
+            send(Protocol.RES_ERROR + " Konnte Lobby nicht betreten.");
+        }
     }
 
-    private void handleWho() throws IOException {
-        List<String> users = server.getLoggedInUsernames();
-        send(Protocol.buildUserList(users));
-    }
+    private void handleCreateRoom(String[] tokens) throws IOException {
+        if (!requireLogin()) return;
 
-    private void handleMsg(String line, String cmd) throws IOException {
-        if (this.user == null) {
-            // Benutzer nicht eingeloggt → Fehler
-            send(Protocol.RES_ERROR + " Bitte zuerst LOGIN ausführen.");
+        if (tokens.length < 2) {
+            send(Protocol.RES_ERROR + " Usage: CREATE_ROOM <room>");
             return;
         }
-        String text = extractTextAfterCommand(line, cmd);
-        System.out.println("[SERVER] MSG von " + displayName + ": " + text);
 
-        // an alle eingeloggten User verteilen
-        server.broadcastChat(displayName, text);
+        boolean ok = server.createRoom(tokens[1]);
+        if (ok) {
+            send(Protocol.RES_INFO + " Raum erstellt: " + tokens[1]);
+            server.logInfo("CREATE_ROOM by=" + displayName + " room=" + tokens[1] + " ok=" + ok);
+        }
+
+        else send(Protocol.RES_ERROR + " Raum konnte nicht erstellt werden (Name ungültig oder existiert).");
+    }
+
+    private void handleJoin(String[] tokens) throws IOException {
+        if (!requireLogin()) return;
+
+        if (tokens.length < 2) {
+            send(Protocol.RES_ERROR + " Usage: JOIN <room>");
+            return;
+        }
+
+        String room = tokens[1];
+        boolean ok = server.joinRoom(room, this);
+        if (ok) {
+            send(Protocol.RES_INFO + " Joined " + room);
+            server.logInfo("JOIN user=" + displayName + " room=" + room + " ok=" + ok);
+        }
+        else send(Protocol.RES_ERROR + " Raum existiert nicht oder Name ungültig.");
+    }
+
+    private void handleLeave() throws IOException {
+        if (!requireLogin()) return;
+
+        String old = currentRoom;
+        if (old == null) {
+            send(Protocol.RES_INFO + " Du bist in keinem Raum.");
+            return;
+        }
+
+        server.leaveRoom(this);
+        send(Protocol.RES_INFO + " Left " + old);
+        server.logInfo("LEAVE user=" + displayName + " room=" + old);
+    }
+
+    private void handleMsg(String line) throws IOException {
+        if (!requireLogin()) return;
+
+        if (currentRoom == null) {
+            send(Protocol.RES_ERROR + " Du bist in keinem Raum. Erst JOIN <room> ausführen.");
+            return;
+        }
+
+        String text = extractTextAfterCommand(line, Protocol.CMD_MSG);
+        server.broadcastChatToRoom(currentRoom, displayName, text);
+        server.logInfo("MSG room=" + currentRoom + " from=" + displayName + " len=" + text.length());
     }
 
     private void handleLogout() throws IOException {
-        System.out.println("[SERVER] LOGOUT von " + displayName);
         send(Protocol.RES_INFO + " Bye.");
-        running = false; // run()-Schleife endet -> cleanup() wird aufgerufen
+        server.logInfo("LOGOUT user=" + displayName);
+        running = false;
     }
 
-    /* ==================== Hilfsmethoden ==================== */
+    private boolean requireLogin() throws IOException {
+        if (this.user == null) {
+            send(Protocol.RES_ERROR + " Bitte zuerst LOGIN ausführen.");
+            return false;
+        }
+        return true;
+    }
 
     private String extractTextAfterCommand(String line, String cmd) {
-        if (line.length() <= cmd.length()) {
-            return "";
-        }
+        if (line.length() <= cmd.length()) return "";
         return line.substring(cmd.length()).trim();
     }
 
-    public void send(String message) throws IOException {
-        if (out == null) {
-            return;
-        }
+    public synchronized void send(String message) throws IOException {
+        if (out == null) return;
         out.writeUTF(message);
         out.flush();
+    }
+
+    public void closeNow() {
+        running = false;
+        try { socket.close(); } catch (IOException ignore) {}
     }
 
     private void cleanup() {
         running = false;
         server.removeClient(this);
-        try {
-            socket.close();
-        } catch (IOException ignore) {
-        }
+        try { socket.close(); } catch (IOException ignore) {}
+        System.out.println("[SERVER] " + getName() + " beendet.");
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
+    public User getUser() { return user; }
 
-    public void setDisplayName(String name) {
-        this.displayName = name;
-    }
+    public String getDisplayName() { return displayName; }
 
-    public int getClientId() {
-        return clientId;
-    }
+    public String getCurrentRoom() { return currentRoom; }
 
-    public User getUser() {
-        return user;
-    }
+    public void setCurrentRoom(String currentRoom) { this.currentRoom = currentRoom; }
 }
