@@ -32,7 +32,7 @@ public class Config {
         }
 
         serverHost = props.getProperty("server.host", "localhost");
-        serverPort = parseInt(props.getProperty("server.port"), 5000);
+        serverPort = parseInt(props.getProperty("server.port"), 5001);
 
         usersFile = props.getProperty("users.file", "data/users.db");
         pbkdf2Iterations = parseInt(

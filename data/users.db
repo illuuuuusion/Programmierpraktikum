@@ -1,3 +1,10 @@
 # username;iterations;saltBase64;hashBase64;banned
-123;120000;VQk/G8O06nys5EuBddVgBw==;MLLJrBU03HNico/ZNoKyQnwURIX69fG0b05LHeLg2Bc=;false
-alice;120000;VEZAeYiotV45V0VzD3irWQ==;oR74OlFwnHklGj6gqhLJ/YkfTLk4Bb80Q/eyXIudgM8=;false
+abcdefg;120000;NN3nZhdnYOcCB19EQOPIEg==;FpAxe8cnuh9Fl25hZ2Ivv3N35keD1Bw1MIfj/QfwwHQ=;true
+elli;120000;dd2SqmrV45nWnQXTfueNMg==;6KmVMdGh/+CWNkLWGyh9MJyHskE6uRFlohRPQUSNgk4=;false
+halloho;120000;KHsmpODl9Qd3jiiIA41D+A==;UxL1/vmR+dgpP9IPUNb9aVr1yX/kWmhGtvUF0e/VfSo=;false
+hallona;120000;dwa/yDvBEMtwWsbGtsTThQ==;7xd29w1PHqZU8kPyKMMKYFLWQ5JtQTQ4zM7RFkzWb30=;false
+user1;120000;HyZcm9iWwmbspqQc/rNttg==;YbDo6f2S7eSy1rk+JP5mLQCl8cHj3YHKUbN83gWu00A=;false
+user18;120000;S4JYKVQuZ6OyK4uZ3wQ7ew==;L3MsM9oq5EV+IPq9951fhhVI7+m1GAgD6Ta5fKk7dIg=;false
+user2;120000;dkngjkuVZyXaJpckptcVBg==;Eyo8w2Sduo3eQpJoXdWbD5exfWGebmtbPONvFq8g/1A=;true
+user4;120000;f8ujBQPOvxIv3/yZWIwGaw==;NO9CpJdf0ysCqVH8YncdogtNnVnHitLeXDQ0ga69TsI=;false
+user5;120000;0NL5D7258l62xwTHcXuqVg==;XmTLrbxdhqvWu4YYuIqYyAxJfaGDjg1f7fhoa4n+7LQ=;false

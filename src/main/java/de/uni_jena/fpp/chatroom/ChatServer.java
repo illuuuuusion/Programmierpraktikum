@@ -32,7 +32,8 @@ public class ChatServer {
         this.port = port;
         this.userRepo = userRepo;
         this.logger = logger;
-        rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM));
+        rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM, true));
+
     }
 
     public void start() {
@@ -75,23 +76,58 @@ public class ChatServer {
             System.out.println("[SERVER] Server beendet.");
 
             // Logger schließen (Datei-Handle freigeben)
-            try {
-                logger.close();
-            } catch (Exception ignore) {}
+
         }
+    }
+    public java.util.Map<String, String> getOnlineUserRooms() {
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        for (var e : loggedInClients.entrySet()) {
+            String room = e.getValue().getCurrentRoom();
+            map.put(e.getKey(), room == null ? "-" : room);
+        }
+        return map;
+    }
+    public boolean isRunning() {
+        return running;
     }
 
 
     public void stop() {
+        // Mehrfaches Stop ist ok
+        if (!running) {
+            logger.info("Stop requested (already stopped)");
+        }
+
         running = false;
         logger.info("Stop requested");
 
+        // 1) accept() beenden
         try {
-            if (serverSocket != null) serverSocket.close();
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
         } catch (IOException e) {
             logger.error("Fehler beim Schließen des ServerSocket: " + e.getMessage());
         }
+
+        // 2) ALLE Clients trennen, damit nichts mehr "weiterläuft"
+        for (ClientHandler ch : new ArrayList<>(connections)) {
+            try {
+                ch.send(Protocol.RES_INFO + " Server wird beendet.");
+            } catch (Exception ignore) {}
+            ch.closeNow();
+        }
+
+        // 3) Server-State zurücksetzen (optional, aber praktisch)
+        connections.clear();
+        loggedInClients.clear();
+
+        rooms.clear();
+        rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM, true));
+
+        logger.info("Stop komplett (clients geschlossen)");
     }
+
 
     // ===== Schritt 2.3: Persistente Userverwaltung =====
 
@@ -235,10 +271,14 @@ public class ChatServer {
     public boolean joinRoom(String roomName, ClientHandler handler) {
         if (!isValidRoomName(roomName)) return false;
 
-        Room target = rooms.get(roomName);
-        if (target == null) return false;
+        if (roomName.equals(handler.getCurrentRoom())) {
+            return true;
+        }
 
         leaveRoom(handler);
+
+        Room target = rooms.get(roomName);
+        if (target == null) return false;
 
         handler.setCurrentRoom(roomName);
         target.addMember(handler);
@@ -259,12 +299,12 @@ public class ChatServer {
 
             broadcastRoomUsers(old);
 
-            if (room.isEmpty() && !DEFAULT_ROOM.equals(old)) {
+            if (room.isEmpty() && !room.isPersistent() && !DEFAULT_ROOM.equals(old)) {
                 rooms.remove(old);
                 broadcastRoomListToAll();
                 logger.info("ROOM_DELETE " + old);
-
             }
+
         }
     }
 
@@ -322,6 +362,49 @@ public class ChatServer {
             }
         }
     }
+
+    public boolean createRoomAsServer(String roomName) {
+        if (!isValidRoomName(roomName)) return false;
+
+        Room existing = rooms.putIfAbsent(roomName, new Room(roomName, true));
+        if (existing == null) {
+            broadcastRoomListToAll();
+            logger.info("ROOM_CREATE_ADMIN " + roomName);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean deleteRoomAsServer(String roomName) {
+        if (roomName == null || roomName.isBlank()) return false;
+        if (DEFAULT_ROOM.equals(roomName)) return false; // Lobby nie löschen
+
+        Room room = rooms.remove(roomName);
+        if (room == null) return false;
+
+        // Members kopieren
+        var members = new java.util.ArrayList<>(room.getMembers());
+
+        for (ClientHandler ch : members) {
+            try { ch.send(Protocol.RES_INFO + " Raum wurde vom Server gelöscht: " + roomName); } catch (Exception ignore) {}
+
+            // sauber aus altem room-member-set entfernen
+            room.removeMember(ch);
+
+            ch.setCurrentRoom(null);
+
+            // in Lobby
+            joinRoom(DEFAULT_ROOM, ch);
+        }
+
+
+        broadcastRoomListToAll();
+        broadcastRoomUsers(DEFAULT_ROOM);
+        logger.info("ROOM_DELETE_ADMIN " + roomName);
+        return true;
+    }
+
+
 
     // Validation Helpers
 

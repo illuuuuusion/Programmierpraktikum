@@ -8,15 +8,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Room {
 
     private final String name;
+    private final boolean persistent;
     private final Set<ClientHandler> members = ConcurrentHashMap.newKeySet();
 
     public Room(String name) {
-        this.name = name;
+        this(name, false);
     }
 
-    public String getName() {
-        return name;
+    public Room(String name, boolean persistent) {
+        this.name = name;
+        this.persistent = persistent;
     }
+
+    public String getName() { return name; }
+
+    public boolean isPersistent() { return persistent; }
 
     public Set<ClientHandler> getMembers() {
         return members;

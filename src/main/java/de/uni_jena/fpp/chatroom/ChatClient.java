@@ -81,7 +81,7 @@ public class ChatClient {
     }
 
     public void leave() throws IOException {
-        model.setCurrentRoom(null);
+        model.setCurrentRoom("Lobby");
         send(Protocol.buildLeave());
     }
 
@@ -174,29 +174,30 @@ public class ChatClient {
             }
 
             case Protocol.RES_WARN -> {
-                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                String txt = payload(tokens);
                 model.addChatLine("[WARN] " + txt);
                 fireWarn(txt);
             }
 
             case Protocol.RES_BANNED -> {
-                String reason = (tokens.length >= 2) ? tokens[1] : "";
+                String reason = payload(tokens);
                 model.addChatLine("[BANNED] " + reason);
                 fireBanned(reason);
                 disconnect();
             }
 
             case Protocol.RES_INFO -> {
-                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                String txt = payload(tokens);
                 model.addChatLine("[INFO] " + txt);
                 fireInfo(txt);
             }
 
             case Protocol.RES_ERROR -> {
-                String txt = (tokens.length >= 2) ? tokens[1] : "";
+                String txt = payload(tokens);
                 model.addChatLine("[ERROR] " + txt);
                 fireError(txt);
             }
+
 
             default -> {
                 // Für Debug: unbekannte Servermessage anzeigen
@@ -233,6 +234,11 @@ public class ChatClient {
                 sendMessage(line);
             }
         }
+    }
+    private static String payload(String[] tokens) {
+        if (tokens.length < 2) return "";
+        if (tokens.length == 2) return tokens[1];
+        return tokens[1] + " " + tokens[2];
     }
 
     private boolean handleConsoleCommand(String line) throws IOException {
@@ -312,3 +318,5 @@ public class ChatClient {
         for (ChatClientListener l : listeners) l.onConnectionClosed();
     }
 }
+
+

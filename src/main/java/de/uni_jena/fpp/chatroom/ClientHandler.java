@@ -170,6 +170,10 @@ public class ClientHandler extends Thread {
         }
 
         String room = tokens[1];
+        if (room.equals(currentRoom)) {
+            send(Protocol.RES_INFO + " Du bist schon in diesem Raum.");
+            return;
+        }
         boolean ok = server.joinRoom(room, this);
         if (ok) {
             send(Protocol.RES_INFO + " Joined " + room);
@@ -181,16 +185,15 @@ public class ClientHandler extends Thread {
     private void handleLeave() throws IOException {
         if (!requireLogin()) return;
 
-        String old = currentRoom;
-        if (old == null) {
-            send(Protocol.RES_INFO + " Du bist in keinem Raum.");
-            return;
+        // Immer zurück in Lobby
+        boolean ok = server.joinRoom(ChatServer.DEFAULT_ROOM, this);
+        if (ok) {
+            send(Protocol.RES_INFO + " Joined " + ChatServer.DEFAULT_ROOM);
+        } else {
+            send(Protocol.RES_ERROR + " Konnte Lobby nicht betreten.");
         }
-
-        server.leaveRoom(this);
-        send(Protocol.RES_INFO + " Left " + old);
-        server.logInfo("LEAVE user=" + displayName + " room=" + old);
     }
+
 
     private void handleMsg(String line) throws IOException {
         if (!requireLogin()) return;

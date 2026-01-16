@@ -1,11 +1,32 @@
+package de.uni_jena.fpp.chatroom.frames;
+
+import de.uni_jena.fpp.chatroom.ChatClient;
+
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 
 public class CreateRoomFrame extends MainFrame {
 
+    private final ChatClient client;
+
+    public CreateRoomFrame() {
+        this(null);
+    }
+
+    public CreateRoomFrame(ChatClient client) {
+        this.client = client;
+    }
+
     public void initialize(JFrame frame) {
+
+        // --------------- Label + TextField -------------------------
+        JPanel panel = new JPanel();
+        panel.setBorder(new TitledBorder("Raum erstellen"));
+        JTextField tfRoomName = new JTextField("Name");
+        panel.add(tfRoomName);
 
         // --------------- Button -------------------------
         JButton btnCreate = new JButton("erstellen");
@@ -13,19 +34,40 @@ public class CreateRoomFrame extends MainFrame {
         btnCreate.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (true) { // TODO check if RoomName is valid, "RoomName.valid() == true"
-                    if (false) { // TODO check if RoomName is taken, "RoomName.not_taken() == true"
-                        MessageFrame msgFrame = new MessageFrame();
-                        msgFrame.initialize(msgFrame, 2, 0);
-                    }
-                    else {
-                        MessageFrame msgFrame = new MessageFrame();
-                        msgFrame.initialize(msgFrame, 2, 2);
-                    }
+
+                String roomName = tfRoomName.getText().trim();
+
+                // Minimal-Checks (Server prüft eh nochmal)
+                if (roomName.isEmpty() || roomName.equalsIgnoreCase("Name")) {
+                    MessageFrame msgFrame = new MessageFrame();
+                    msgFrame.initialize(msgFrame, 2, 1); // "Invalider Raum Name."
+                    return;
                 }
-                else {
+                if (roomName.contains(" ") || roomName.contains("|")) {
                     MessageFrame msgFrame = new MessageFrame();
                     msgFrame.initialize(msgFrame, 2, 1);
+                    return;
+                }
+
+                if (client == null) {
+                    MessageFrame msgFrame = new MessageFrame();
+                    msgFrame.initialize(msgFrame, 0, 0); // "Noch nicht implementiert."
+                    return;
+                }
+
+                try {
+                    client.createRoom(roomName);
+
+                    // Wir können nicht 100% sicher wissen ob ok, weil Server INFO/ERROR async schickt.
+                    // Für MVP: optimistisch -> Erfolgsmeldung + Fenster zu.
+                    MessageFrame msgFrame = new MessageFrame();
+                    msgFrame.initialize(msgFrame, 2, 0); // "Raum erfolgreich erstellt."
+                    frame.dispose();
+
+                } catch (IOException ex) {
+                    // Bei Send-Problemen -> Fehler
+                    MessageFrame msgFrame = new MessageFrame();
+                    msgFrame.initialize(msgFrame, 2, 2); // "Raum Name existiert bereits." (oder allgemeiner fail)
                 }
             }
         });
@@ -44,15 +86,6 @@ public class CreateRoomFrame extends MainFrame {
         buttonsPanel.add(btnCreate);
         buttonsPanel.add(btnCancel);
 
-
-        // --------------- Label + TextField -------------------------
-        JPanel panel = new JPanel();
-        panel.setBorder(new TitledBorder("Raum erstellen"));
-        JTextField tfRoomName = new JTextField("Name");
-        panel.add(tfRoomName);
-
-
-
         // --------------- Main Panel -------------------------
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new BorderLayout());
@@ -66,9 +99,9 @@ public class CreateRoomFrame extends MainFrame {
 
         setTitle("Meldung");
         setMinimumSize(new Dimension(380, 150));
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE); // ✅ wichtig
         setVisible(true);
-        frame.pack();  
+        frame.pack();
     }
 
     public static void main(String[] args) {

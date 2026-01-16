@@ -1,8 +1,26 @@
+package de.uni_jena.fpp.chatroom.frames;
+
+import de.uni_jena.fpp.chatroom.ChatClient;
+
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
 import javax.swing.*;
 
+import de.uni_jena.fpp.chatroom.ChatClient;
+import java.io.IOException;
+
+
+
 public class CloseRoomFrame extends MainFrame {
+
+    private final ChatClient client;
+    public CloseRoomFrame() {
+        this(null);
+    }
+    public CloseRoomFrame(ChatClient client) {
+        this.client = client;
+    }
 
     public void initialize(JFrame frame) {
 
@@ -12,10 +30,12 @@ public class CloseRoomFrame extends MainFrame {
         btnConfirm.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // TODO tell server to close current room
-                System.out.println("raum geschlossen");
-                // TODO update the Chat border back to "Chat"
+                //  Raum verlassen (Server löscht ggf. Raum automatisch wenn leer)
+                if (client != null) {
+                    try { client.leave(); } catch (IOException ex) { /* optional MessageFrame */ }
+                }
                 frame.dispose();
+
             }
         });
 
@@ -33,10 +53,8 @@ public class CloseRoomFrame extends MainFrame {
         buttonsPanel.add(btnConfirm);
         buttonsPanel.add(btnCancel);
 
-
         // --------------- Label -------------------------
         JLabel lbConfirm = new JLabel("Möchten sie den Raum schließen?");
-
 
         // --------------- Main Panel -------------------------
         JPanel mainPanel = new JPanel();
@@ -51,9 +69,9 @@ public class CloseRoomFrame extends MainFrame {
 
         setTitle("Meldung");
         setMinimumSize(new Dimension(380, 150));
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE); // ✅ wichtig
         setVisible(true);
-        frame.pack();  
+        frame.pack();
     }
 
     public static void main(String[] args) {
