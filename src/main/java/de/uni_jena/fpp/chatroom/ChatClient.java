@@ -1,12 +1,10 @@
 package de.uni_jena.fpp.chatroom;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -20,6 +18,7 @@ public class ChatClient {
     private DataOutputStream out;
 
     private volatile boolean running = true;
+    private final Path downloadDir = Path.of("downloads");
 
     // Model + Listener
     private final ClientModel model = new ClientModel();
@@ -75,13 +74,10 @@ public class ChatClient {
     }
 
     public void join(String room) throws IOException {
-        // damit UI sofort currentRoom kennt
-        model.setCurrentRoom(room);
         send(Protocol.buildJoin(room));
     }
 
     public void leave() throws IOException {
-        model.setCurrentRoom("Lobby");
         send(Protocol.buildLeave());
     }
 
@@ -145,6 +141,36 @@ public class ChatClient {
             }
         }
 
+        if (line.startsWith(Protocol.RES_FILE + " ")) {
+            String[] t = line.trim().split("\\s+", 3);
+            if (t.length < 3) {
+                model.addChatLine("[ERROR] Ungültiger FILE Header: " + line);
+                fireError("Ungültiger FILE Header");
+                return;
+            }
+
+            String filename = t[1];
+            long size;
+            try {
+                size = Long.parseLong(t[2]);
+            } catch (NumberFormatException e) {
+                model.addChatLine("[ERROR] Ungültige Dateigröße: " + t[2]);
+                fireError("Ungültige Dateigröße");
+                return;
+            }
+
+            try {
+                receiveFile(filename, size);
+                String msg = "Download gespeichert: " + filename + " (" + size + " Bytes)";
+                model.addChatLine("[INFO] " + msg);
+                fireInfo(msg);
+            } catch (IOException e) {
+                model.addChatLine("[ERROR] Download fehlgeschlagen: " + e.getMessage());
+                fireError("Download fehlgeschlagen: " + e.getMessage());
+            }
+            return;
+        }
+
         String[] tokens = Protocol.splitTokens(line);
         if (tokens.length == 0) return;
 
@@ -160,16 +186,26 @@ public class ChatClient {
 
             case Protocol.RES_ROOM_USERS -> {
                 if (tokens.length < 2) return;
+
                 String room = tokens[1];
                 List<String> users = (tokens.length >= 3)
                         ? Protocol.parsePipeList(tokens[2])
                         : List.of();
 
-                // Aktualisiere nur die Userliste des aktuellen Raums
                 String cur = model.getCurrentRoom();
-                if (cur != null && cur.equals(room)) {
-                    model.setUsersInCurrentRoom(users);
+                boolean roomChanged = (cur == null || cur.isBlank() || !cur.equals(room));
+
+                if (roomChanged) {
+                    model.setCurrentRoom(room); // cleared users/files -> OK
+                    // automatisch Files für den neuen Raum laden
+                    try {
+                        listFiles(room);
+                    } catch (IOException ex) {
+                        model.addChatLine("[ERROR] FILES: " + ex.getMessage());
+                        fireError("FILES: " + ex.getMessage());
+                    }
                 }
+                model.setUsersInCurrentRoom(users);
                 fireUsersUpdated(room, users);
             }
 
@@ -188,14 +224,66 @@ public class ChatClient {
 
             case Protocol.RES_INFO -> {
                 String txt = payload(tokens);
+
+                // Fallback: Server sagt explizit "Joined <room>"
+                if (txt != null && txt.startsWith("Joined ")) {
+                    String room = txt.substring("Joined ".length()).trim();
+                    if (!room.isBlank()) {
+                        String cur = model.getCurrentRoom();
+                        boolean roomChanged = (cur == null || cur.isBlank() || !cur.equals(room));
+                        if (roomChanged) {
+                            model.setCurrentRoom(room);
+                            try {
+                                listFiles(room);
+                            } catch (IOException ex) {
+                                model.addChatLine("[ERROR] FILES: " + ex.getMessage());
+                                fireError("FILES: " + ex.getMessage());
+                            }
+                        }
+                    }
+                }
+
                 model.addChatLine("[INFO] " + txt);
                 fireInfo(txt);
             }
+
 
             case Protocol.RES_ERROR -> {
                 String txt = payload(tokens);
                 model.addChatLine("[ERROR] " + txt);
                 fireError(txt);
+            }
+            case Protocol.RES_FILE_LIST -> {
+                if (tokens.length < 2) return;
+                String room = tokens[1];
+                List<String> files = (tokens.length >= 3)
+                        ? Protocol.parsePipeList(tokens[2])
+                        : List.of();
+                String cur = model.getCurrentRoom();
+                if (cur != null && cur.equals(room)) {
+                    model.setFilesInCurrentRoom(files);
+                }
+
+                fireFileList(room, files);
+            }
+
+
+            case Protocol.RES_UPLOAD_OK -> {
+                String fn = (tokens.length >= 2) ? tokens[1] : "?";
+                model.addChatLine("[INFO] Upload OK: " + fn);
+                fireInfo("Upload OK: " + fn);
+            }
+
+            case Protocol.RES_UPLOAD_FAILED -> {
+                String reason = payload(tokens);
+                model.addChatLine("[ERROR] Upload failed: " + reason);
+                fireError("Upload failed: " + reason);
+            }
+
+            case Protocol.RES_DOWNLOAD_FAILED -> {
+                String reason = payload(tokens);
+                model.addChatLine("[ERROR] Download failed: " + reason);
+                fireError("Download failed: " + reason);
             }
 
 
@@ -218,6 +306,10 @@ public class ChatClient {
                   /msg <text>
                   /logout
                   /quit
+                  /files <room>
+                  /download <room> <filename>
+                  /upload <room> <path>
+                
                 """);
 
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
@@ -274,6 +366,19 @@ public class ChatClient {
                 running = false;
                 return false;
             }
+            case "/files" -> {
+                if (parts.length < 2) { System.out.println("Usage: /files <room>"); return true; }
+                listFiles(parts[1]);
+            }
+            case "/download" -> {
+                if (parts.length < 3) { System.out.println("Usage: /download <room> <filename>"); return true; }
+                downloadFile(parts[1], parts[2]);
+            }
+            case "/upload" -> {
+                if (parts.length < 3) { System.out.println("Usage: /upload <room> <path>"); return true; }
+                uploadFile(parts[1], Path.of(parts[2]));
+            }
+
             default -> System.out.println("Unbekannt: " + cmd);
         }
         return true;
@@ -317,6 +422,115 @@ public class ChatClient {
     private void fireConnectionClosed() {
         for (ChatClientListener l : listeners) l.onConnectionClosed();
     }
+
+    private void receiveFile(String filename, long size) throws IOException {
+        if (size < 0) throw new IOException("Negative Größe");
+
+        Files.createDirectories(downloadDir);
+
+        Path target = downloadDir.resolve(filename).normalize();
+        if (!target.startsWith(downloadDir)) {
+            throw new IOException("Ungültiger Dateiname (Path Traversal)");
+        }
+
+        // Falls Datei existiert: _1, _2, ...
+        if (Files.exists(target)) {
+            String base = filename;
+            String ext = "";
+            int dot = filename.lastIndexOf('.');
+            if (dot > 0) {
+                base = filename.substring(0, dot);
+                ext = filename.substring(dot);
+            }
+            int i = 1;
+            while (Files.exists(target)) {
+                target = downloadDir.resolve(base + "_" + i + ext).normalize();
+                i++;
+            }
+        }
+
+        try (OutputStream fos = Files.newOutputStream(
+                target,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE
+        )) {
+            byte[] buf = new byte[8192];
+            long remaining = size;
+
+            while (remaining > 0) {
+                int toRead = (int) Math.min(buf.length, remaining);
+                int r = in.read(buf, 0, toRead);
+                if (r == -1) throw new IOException("EOF während Download");
+                fos.write(buf, 0, r);
+                remaining -= r;
+            }
+        }
+    }
+
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024; // 50 MB
+
+    public void uploadFile(String room, Path file) throws IOException {
+        if (file == null || !Files.exists(file) || !Files.isRegularFile(file)) {
+            throw new IOException("Datei existiert nicht");
+        }
+        if (room == null || room.isBlank()) {
+            throw new IOException("Kein Raum angegeben");
+        }
+
+        String filename = file.getFileName().toString();
+        long size = Files.size(file);
+
+        if (size < 0 || size > MAX_FILE_BYTES) throw new IOException("Datei zu groß (max 50MB)");
+        if (!isValidFilename(filename)) throw new IOException("Ungültiger Dateiname");
+
+        // Wichtig: Header + Bytes dürfen nicht mit anderen send() Calls vermischt werden
+        synchronized (this) {
+            out.writeUTF(Protocol.buildUpload(room, filename, size));
+            out.flush();
+
+            try (InputStream fis = Files.newInputStream(file)) {
+                byte[] buf = new byte[8192];
+                long remaining = size;
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int r = fis.read(buf, 0, toRead);
+                    if (r == -1) throw new IOException("EOF beim Lesen der Datei");
+                    out.write(buf, 0, r);
+                    remaining -= r;
+                }
+            }
+            out.flush();
+        }
+    }
+
+    public void listFiles(String room) throws IOException {
+        send(Protocol.buildFiles(room));
+    }
+
+    public void downloadFile(String room, String filename) throws IOException {
+        send(Protocol.buildDownload(room, filename));
+    }
+
+    private void fireFileList(String room, List<String> files) {
+        for (ChatClientListener l : listeners) l.onFileList(room, files);
+    }
+    private void fireFilesUpdated(String room, List<String> files) {
+        for (ChatClientListener l : listeners) l.onFilesUpdated(room, files);
+    }
+
+
+
+    private boolean isValidFilename(String s) {
+        if (s == null) return false;
+        if (s.isBlank()) return false;
+        if (s.contains("..")) return false;
+        if (s.contains("/") || s.contains("\\")) return false;
+        if (s.contains("|") || s.contains(";")) return false;
+        if (s.contains(" ")) return false;
+        return true;
+    }
+
+
 }
 
 

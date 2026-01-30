@@ -10,6 +10,17 @@ public class ClientModel {
     private String currentRoom;
     private final List<String> usersInCurrentRoom = new ArrayList<>();
     private final List<String> chatLines = new ArrayList<>();
+    private final List<String> filesInCurrentRoom = new ArrayList<>();
+
+    public synchronized List<String> getFilesInCurrentRoom() {
+        return new ArrayList<>(filesInCurrentRoom);
+    }
+
+    public synchronized void setFilesInCurrentRoom(List<String> files) {
+        filesInCurrentRoom.clear();
+        if (files != null) filesInCurrentRoom.addAll(files);
+        filesInCurrentRoom.sort(String::compareToIgnoreCase);
+    }
 
     // Begrenzung, damit UI nicht unendlich wächst
     private int maxChatLines = 500;
@@ -40,6 +51,7 @@ public class ClientModel {
         this.currentRoom = room;
         // wenn room gewechselt wird, kann UI users neu bekommen
         usersInCurrentRoom.clear();
+        filesInCurrentRoom.clear();
     }
 
     public synchronized void setUsersInCurrentRoom(List<String> users) {

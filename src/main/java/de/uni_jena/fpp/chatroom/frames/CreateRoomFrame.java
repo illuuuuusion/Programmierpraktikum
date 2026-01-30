@@ -37,7 +37,7 @@ public class CreateRoomFrame extends MainFrame {
 
                 String roomName = tfRoomName.getText().trim();
 
-                // Minimal-Checks (Server prüft eh nochmal)
+                // Minimal-Checks (Server prüft nochmal)
                 if (roomName.isEmpty() || roomName.equalsIgnoreCase("Name")) {
                     MessageFrame msgFrame = new MessageFrame();
                     msgFrame.initialize(msgFrame, 2, 1); // "Invalider Raum Name."

@@ -3,17 +3,20 @@ package de.uni_jena.fpp.chatroom.frames;
 import de.uni_jena.fpp.chatroom.ChatClient;
 import de.uni_jena.fpp.chatroom.ChatClientListener;
 
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.IOException;
-import java.util.List;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 
 public class ChatFrame extends MainFrame {
 
     private final ChatClient client;
+
+    // FIX 1: filesModel deklarieren
+    private final DefaultListModel<String> filesModel = new DefaultListModel<>();
 
     public ChatFrame() {
         this(null);
@@ -24,158 +27,134 @@ public class ChatFrame extends MainFrame {
     }
 
     public void initialize(JFrame frame) {
-        setSize(900, 500);
-        setLocation(750, 320);
-        setTitle("Chat Client");
+        // FIX 3: frame konsequent verwenden
+        frame.setSize(900, 500);
+        frame.setLocation(750, 320);
+        frame.setTitle("Chat Client");
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.getContentPane().removeAll();
 
         // --------------- TOP Layer ---------------
-        JPanel mainPanel = new JPanel();
+        JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(mainColor);
         mainPanel.setFont(mainFont);
         mainPanel.setOpaque(true);
         mainPanel.setBorder(new TitledBorder("Chat Client"));
-        mainPanel.setLayout(new BorderLayout());
 
-        JPanel split = new JPanel();
-        split.setLayout(new GridLayout(1,2));
+        JPanel split = new JPanel(new GridLayout(1, 2));
 
         // --------------- Chat Layer ---------------
-
-        // Chat Panel
-        JPanel chatPanel = new JPanel();
+        JPanel chatPanel = new JPanel(new BorderLayout());
         chatPanel.setBorder(new TitledBorder("Chat"));
         chatPanel.setBackground(mainColor);
         chatPanel.setOpaque(true);
-        SpringLayout chatLayout = new SpringLayout();
-        chatPanel.setLayout(chatLayout);
 
-        TextArea chatBox = new TextArea();
-        chatPanel.add(chatBox);
+        // FIX 2: Swing JTextArea statt AWT TextArea
+        JTextArea chatBox = new JTextArea();
+        chatBox.setEditable(false);
+        chatBox.setFont(mainFont);
+        chatBox.setLineWrap(true);
+        chatBox.setWrapStyleWord(true);
 
-        // Message Panel
-        JPanel msgPanel = new JPanel();
-        msgPanel.setBorder(new TitledBorder("Message"));
-        msgPanel.setLayout(new GridLayout(1, 2));
+        JScrollPane chatScroll = new JScrollPane(chatBox);
+        chatPanel.add(chatScroll, BorderLayout.CENTER);
+
+        JPanel msgPanel = new JPanel(new GridLayout(1, 2));
+        msgPanel.setBorder(new TitledBorder("Nachricht"));
 
         JTextField tfMessage = new JTextField();
         tfMessage.setFont(mainFont);
         msgPanel.add(tfMessage);
 
-        JButton btnSend = new JButton("Send");
+        JButton btnSend = new JButton("Senden");
         btnSend.setFont(mainFont);
-        btnSend.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // Send message to server
-                if (client == null) {
-                    chatBox.append("[ERROR] Kein Client verbunden.\n");
-                    return;
-                }
-                String text = tfMessage.getText().trim();
-                if (text.isEmpty()) return;
+        btnSend.addActionListener((ActionEvent e) -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
+            }
+            String text = tfMessage.getText().trim();
+            if (text.isEmpty()) return;
 
-                try {
-                    client.sendMessage(text);
-                    tfMessage.setText("");
-                } catch (IOException ex) {
-                    chatBox.append("[ERROR] " + ex.getMessage() + "\n");
-                }
+            try {
+                client.sendMessage(text);
+                tfMessage.setText("");
+            } catch (IOException ex) {
+                chatBox.append("[ERROR] " + ex.getMessage() + "\n");
             }
         });
         msgPanel.add(btnSend);
 
-        // Enter im Textfeld = senden
         tfMessage.addActionListener(e -> btnSend.doClick());
-
-        chatPanel.add(msgPanel);
-
-        chatLayout.putConstraint(SpringLayout.NORTH, chatBox, 0, SpringLayout.NORTH, chatPanel);
-        chatLayout.putConstraint(SpringLayout.SOUTH, chatBox, -30, SpringLayout.NORTH, msgPanel);
-        chatLayout.putConstraint(SpringLayout.WEST, chatBox, 0, SpringLayout.WEST, chatPanel);
-        chatLayout.putConstraint(SpringLayout.EAST, chatBox, -10, SpringLayout.EAST, chatPanel);
-
-        chatLayout.putConstraint(SpringLayout.SOUTH, msgPanel, 0, SpringLayout.SOUTH, chatPanel);
-        chatLayout.putConstraint(SpringLayout.WEST, msgPanel, 0, SpringLayout.WEST, chatPanel);
-        chatLayout.putConstraint(SpringLayout.EAST, msgPanel, 0, SpringLayout.EAST, chatPanel);
+        chatPanel.add(msgPanel, BorderLayout.SOUTH);
 
         // --------------- Room Layer ---------------
-        JPanel roomPanel1 = new JPanel();
-        roomPanel1.setBorder(new TitledBorder("Rooms"));
-        roomPanel1.setLayout(new GridLayout(2, 1));
+        JPanel roomPanel1 = new JPanel(new GridLayout(2, 1));
+        roomPanel1.setBorder(new TitledBorder("Räume"));
         roomPanel1.setBackground(mainColor);
         roomPanel1.setOpaque(true);
 
-        JPanel roomPanel2 = new JPanel();
+        JPanel roomPanel2 = new JPanel(new GridLayout(1, 2));
         roomPanel2.setBorder(new TitledBorder("verwalten"));
-        roomPanel2.setLayout(new GridLayout(1, 2));
 
-        // Rooms Model statt Dummy Array
         DefaultListModel<String> roomsModel = new DefaultListModel<>();
         JList<String> roomList = new JList<>(roomsModel);
         roomList.setFont(mainFont);
 
-        JPanel roomPanel4 = new JPanel();
-        roomPanel4.setLayout(new GridLayout(3, 1));
+        JPanel roomPanel4 = new JPanel(new GridLayout(3, 1));
 
         JButton btnCreate = new JButton("Raum erstellen");
         btnCreate.setFont(mainFont);
-        btnCreate.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // Minimal: Frame wie gehabt öffnen (noch nicht angebunden)
-                CreateRoomFrame roomFrame = new CreateRoomFrame(client);
-                roomFrame.initialize(roomFrame);
-
-            }
+        btnCreate.addActionListener(e -> {
+            CreateRoomFrame roomFrame = new CreateRoomFrame(client);
+            roomFrame.initialize(roomFrame);
         });
 
         JButton btnJoin = new JButton("Raum beitreten");
         btnJoin.setFont(mainFont);
-        btnJoin.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (client == null) {
-                    chatBox.append("[ERROR] Kein Client verbunden.\n");
+        btnJoin.addActionListener(e -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
+            }
+
+            if (roomList.isSelectionEmpty()) {
+                chatBox.append("[INFO] Wähle einen Chat-Raum aus!\n");
+                return;
+            }
+
+            String room = roomList.getSelectedValue();
+            try {
+                String cur = client.getModel().getCurrentRoom();
+                if (cur != null && cur.equals(room)) {
+                    chatBox.append("[INFO] Du bist schon in diesem Raum.\n");
                     return;
                 }
 
-                if (roomList.isSelectionEmpty()) {
-                    chatBox.append("[INFO] Wähle einen Chat-Raum aus!\n");
-                } else {
-                    String room = roomList.getSelectedValue();
-                    try {
-                        String cur = client.getModel().getCurrentRoom();
-                        if (cur != null && cur.equals(room)) {
-                            chatBox.append("[INFO] Du bist schon in diesem Raum.\n");
-                            return;
-                        }
+                client.join(room);
+                filesModel.clear();
+                client.listFiles(room);
+                chatPanel.setBorder(new TitledBorder(room));
+                chatPanel.revalidate();
+                chatPanel.repaint();
 
-                        client.join(room);
-                        chatPanel.setBorder(new TitledBorder(room));
-                        chatBox.append("[INFO] Raum " + room + " beigetreten.\n");
-                    } catch (IOException ex) {
-                        chatBox.append("[ERROR] " + ex.getMessage() + "\n");
-                    }
-                }
+                chatBox.append("[INFO] Raum " + room + " beigetreten.\n");
+                chatBox.setCaretPosition(chatBox.getDocument().getLength());
+            } catch (IOException ex) {
+                chatBox.append("[ERROR] " + ex.getMessage() + "\n");
             }
         });
 
         JButton btnLeave = new JButton("Raum verlassen");
         btnLeave.setFont(mainFont);
-        btnLeave.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (client == null) {
-                    chatBox.append("[ERROR] Kein Client verbunden.\n");
-                    return;
-                }
-
-                // nur Dialog öffnen, NICHT sofort leave senden
-                CloseRoomFrame closeRoomFrame = new CloseRoomFrame(client);
-                closeRoomFrame.initialize(closeRoomFrame);
+        btnLeave.addActionListener(e -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
             }
+            CloseRoomFrame closeRoomFrame = new CloseRoomFrame(client);
+            closeRoomFrame.initialize(closeRoomFrame);
         });
-
 
         roomPanel4.add(btnCreate);
         roomPanel4.add(btnJoin);
@@ -184,72 +163,113 @@ public class ChatFrame extends MainFrame {
         roomPanel2.add(new JScrollPane(roomList));
         roomPanel2.add(roomPanel4);
 
-        // online users + dateien
-        JPanel roomPanel3 = new JPanel();
-        roomPanel3.setLayout(new GridLayout(1, 2));
+        // --------------- Users + Files ---------------
+        JPanel roomPanel3 = new JPanel(new GridLayout(1, 2));
 
-        JPanel users = new JPanel();
+        JPanel users = new JPanel(new GridLayout(1, 1));
         users.setBorder(new TitledBorder("Nutzer im Raum"));
-        users.setLayout(new GridLayout(1, 1));
 
-        // Users Model statt Dummy Array
         DefaultListModel<String> usersModel = new DefaultListModel<>();
         JList<String> lstUsers = new JList<>(usersModel);
         lstUsers.setEnabled(false);
         lstUsers.setFont(mainFont);
 
-        JPanel roomPanel5 = new JPanel();
-        roomPanel5.setBorder(new TitledBorder("dateien"));
-        roomPanel5.setLayout(new GridLayout(3, 1));
+        users.add(new JScrollPane(lstUsers));
+
+        // Dateien (Liste + Buttons)
+        JPanel roomPanel5 = new JPanel(new BorderLayout());
+        roomPanel5.setBorder(new TitledBorder("Dateien"));
+
+        JList<String> lstFiles = new JList<>(filesModel);
+        lstFiles.setFont(mainFont);
+
+        roomPanel5.add(new JScrollPane(lstFiles), BorderLayout.CENTER);
+
+        JPanel fileButtons = new JPanel(new GridLayout(2, 1));
 
         JButton btnUpload = new JButton("Datei hochladen");
         btnUpload.setFont(mainFont);
-        btnUpload.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                MessageFrame messageFrame = new MessageFrame();
-                messageFrame.initialize(messageFrame, 0, 0);
+        btnUpload.addActionListener(e -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
             }
-        });
 
-        JButton btnShow = new JButton("Datei anzeigen");
-        btnShow.setFont(mainFont);
-        btnShow.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                MessageFrame messageFrame = new MessageFrame();
-                messageFrame.initialize(messageFrame, 0, 0);
+            String room = client.getModel().getCurrentRoom();
+            if (room == null || room.isBlank()) {
+                chatBox.append("[ERROR] Kein aktueller Raum.\n");
+                return;
             }
+
+            JFileChooser fc = new JFileChooser();
+            int res = fc.showOpenDialog(frame);
+            if (res != JFileChooser.APPROVE_OPTION) return;
+
+            File f = fc.getSelectedFile();
+            if (f == null) return;
+
+            btnUpload.setEnabled(false);
+
+            new Thread(() -> {
+                try {
+                    client.uploadFile(room, f.toPath());
+                    client.listFiles(room); // refresh
+                } catch (IOException ex) {
+                    SwingUtilities.invokeLater(() ->
+                            chatBox.append("[ERROR] Upload: " + ex.getMessage() + "\n"));
+                } finally {
+                    SwingUtilities.invokeLater(() -> btnUpload.setEnabled(true));
+                }
+            }, "UploadThread").start();
         });
 
         JButton btnDownload = new JButton("Datei herunterladen");
         btnDownload.setFont(mainFont);
-        btnDownload.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                MessageFrame messageFrame = new MessageFrame();
-                messageFrame.initialize(messageFrame, 0, 0);
+        btnDownload.addActionListener(e -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
+            }
+
+            String room = client.getModel().getCurrentRoom();
+            if (room == null || room.isBlank()) {
+                chatBox.append("[ERROR] Kein aktueller Raum.\n");
+                return;
+            }
+
+            String selected = lstFiles.getSelectedValue();
+            if (selected == null || selected.isBlank()) {
+                String input = JOptionPane.showInputDialog(frame, "Dateiname:", "Download", JOptionPane.PLAIN_MESSAGE);
+                if (input == null) return;
+                selected = input.trim();
+                if (selected.isEmpty()) return;
+            }
+
+            try {
+                client.downloadFile(room, selected);
+            } catch (IOException ex) {
+                chatBox.append("[ERROR] DOWNLOAD: " + ex.getMessage() + "\n");
             }
         });
 
-        roomPanel5.add(btnUpload);
-        roomPanel5.add(btnShow);
-        roomPanel5.add(btnDownload);
+        fileButtons.add(btnUpload);
+        fileButtons.add(btnDownload);
 
-        users.add(new JScrollPane(lstUsers));
+        roomPanel5.add(fileButtons, BorderLayout.SOUTH);
+
         roomPanel3.add(users);
         roomPanel3.add(roomPanel5);
 
         roomPanel1.add(roomPanel2);
         roomPanel1.add(roomPanel3);
 
-        // FINAL ADDING
         split.add(chatPanel);
         split.add(roomPanel1);
-        mainPanel.add(split, BorderLayout.CENTER);
-        add(mainPanel);
 
-        setVisible(true);
+        mainPanel.add(split, BorderLayout.CENTER);
+
+        frame.getContentPane().add(mainPanel);
+        frame.setVisible(true);
 
         // Listener anbinden (Server -> UI Updates)
         if (client != null) {
@@ -265,39 +285,64 @@ public class ChatFrame extends MainFrame {
                 @Override
                 public void onUsersUpdated(String room, List<String> users) {
                     SwingUtilities.invokeLater(() -> {
+                        // FIX 4: nur aktuellen Raum anzeigen (optional, aber korrekt)
+                        String cur = client.getModel().getCurrentRoom();
+                        if (cur == null || !cur.equals(room)) return;
+
                         usersModel.clear();
                         for (String u : users) usersModel.addElement(u);
                     });
                 }
 
                 @Override
+                public void onFileList(String room, List<String> files) {
+                    SwingUtilities.invokeLater(() -> {
+                        // FIX 4: nur aktuellen Raum anzeigen (optional, aber korrekt)
+                        String cur = client.getModel().getCurrentRoom();
+                        if (cur == null || !cur.equals(room)) return;
+
+                        filesModel.clear();
+                        for (String f : files) filesModel.addElement(f);
+                    });
+                }
+
+                @Override
                 public void onChatMessage(String room, String from, String text) {
-                    SwingUtilities.invokeLater(() -> chatBox.append("[" + room + "][" + from + "] " + text + "\n"));
+                    SwingUtilities.invokeLater(() -> {
+                        chatBox.append("[" + room + "][" + from + "] " + text + "\n");
+                        chatBox.setCaretPosition(chatBox.getDocument().getLength());
+                    });
                 }
 
                 @Override
                 public void onInfo(String text) {
                     SwingUtilities.invokeLater(() -> {
-                        // Nicht jedes Protokoll-Info muss im Chat stehen, aber fürs Debug ok
                         chatBox.append("[INFO] " + text + "\n");
+                        chatBox.setCaretPosition(chatBox.getDocument().getLength());
                     });
                 }
 
                 @Override
                 public void onWarn(String text) {
-                    SwingUtilities.invokeLater(() -> chatBox.append("[WARN] " + text + "\n"));
+                    SwingUtilities.invokeLater(() -> {
+                        chatBox.append("[WARN] " + text + "\n");
+                        chatBox.setCaretPosition(chatBox.getDocument().getLength());
+                    });
                 }
 
                 @Override
                 public void onError(String text) {
-                    SwingUtilities.invokeLater(() -> chatBox.append("[ERROR] " + text + "\n"));
+                    SwingUtilities.invokeLater(() -> {
+                        chatBox.append("[ERROR] " + text + "\n");
+                        chatBox.setCaretPosition(chatBox.getDocument().getLength());
+                    });
                 }
 
                 @Override
                 public void onBanned(String reason) {
                     SwingUtilities.invokeLater(() -> {
                         chatBox.append("[BANNED] " + reason + "\n");
-                        JOptionPane.showMessageDialog(ChatFrame.this,
+                        JOptionPane.showMessageDialog(frame,
                                 "Du wurdest gebannt: " + reason,
                                 "BANNED", JOptionPane.ERROR_MESSAGE);
                         frame.dispose();
@@ -310,9 +355,46 @@ public class ChatFrame extends MainFrame {
                 }
             });
 
-            // initialer State (falls schon Daten da sind)
             roomsModel.clear();
             for (String r : client.getModel().getRooms()) roomsModel.addElement(r);
+// Nach Listener-Anbindung und initialem Model-Update:
+            new Thread(() -> {
+                try {
+                    String room = client.getModel().getCurrentRoom();
+
+                    if (room == null || room.isBlank()) {
+                        // Lobby ermitteln (robust)
+                        room = client.getModel().getRooms().stream()
+                                .filter(r -> r != null && r.equalsIgnoreCase("Lobby"))
+                                .findFirst()
+                                .orElseGet(() -> client.getModel().getRooms().isEmpty()
+                                        ? null
+                                        : client.getModel().getRooms().get(0));
+                    }
+
+                    if (room == null || room.isBlank()) {
+                        SwingUtilities.invokeLater(() ->
+                                chatBox.append("[ERROR] Kein initialer Raum gefunden.\n"));
+                        return;
+                    }
+
+                    // Join auslösen, damit currentRoom sauber gesetzt ist (auch wenn serverseitig schon Lobby)
+                    client.join(room);
+
+                    // Files laden
+                    client.listFiles(room);
+
+                    final String finalRoom = room;
+                    SwingUtilities.invokeLater(() -> {
+                        chatPanel.setBorder(new TitledBorder(finalRoom));
+                        chatBox.append("[INFO] Initialer Raum: " + finalRoom + "\n");
+                    });
+
+                } catch (IOException ex) {
+                    SwingUtilities.invokeLater(() ->
+                            chatBox.append("[ERROR] Init-Room: " + ex.getMessage() + "\n"));
+                }
+            }, "InitRoomThread").start();
 
             usersModel.clear();
             for (String u : client.getModel().getUsersInCurrentRoom()) usersModel.addElement(u);

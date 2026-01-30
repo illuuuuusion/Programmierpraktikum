@@ -1,5 +1,6 @@
 package de.uni_jena.fpp.chatroom;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,10 +10,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.io.OutputStream;
+import java.util.stream.Stream;
+import java.io.DataInputStream;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+
+
 
 public class ChatServer {
 
     public static final String DEFAULT_ROOM = "Lobby";
+
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024; // 50 MB
+    private final Path roomsBaseDir = Path.of("data", "rooms");
 
     private final int port;
     private final UserRepository userRepo;
@@ -28,11 +42,19 @@ public class ChatServer {
     private int nextClientId = 1;
     private final ServerLogger logger;
 
+
+
+
     public ChatServer(int port, UserRepository userRepo, ServerLogger logger) {
         this.port = port;
         this.userRepo = userRepo;
         this.logger = logger;
         rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM, true));
+        try {
+            Files.createDirectories(roomsBaseDir);
+        } catch (IOException e) {
+            logger.error("Konnte roomsBaseDir nicht anlegen: " + e.getMessage());
+        }
 
     }
 
@@ -301,6 +323,7 @@ public class ChatServer {
 
             if (room.isEmpty() && !room.isPersistent() && !DEFAULT_ROOM.equals(old)) {
                 rooms.remove(old);
+                deleteRoomStorage(old);
                 broadcastRoomListToAll();
                 logger.info("ROOM_DELETE " + old);
             }
@@ -377,32 +400,27 @@ public class ChatServer {
 
     public boolean deleteRoomAsServer(String roomName) {
         if (roomName == null || roomName.isBlank()) return false;
-        if (DEFAULT_ROOM.equals(roomName)) return false; // Lobby nie löschen
+        if (DEFAULT_ROOM.equals(roomName)) return false;
 
         Room room = rooms.remove(roomName);
-        if (room == null) return false;
+        if (room == null) return false;          // <- erst prüfen
+        deleteRoomStorage(roomName);             // <- dann löschen
 
-        // Members kopieren
         var members = new java.util.ArrayList<>(room.getMembers());
 
         for (ClientHandler ch : members) {
             try { ch.send(Protocol.RES_INFO + " Raum wurde vom Server gelöscht: " + roomName); } catch (Exception ignore) {}
-
-            // sauber aus altem room-member-set entfernen
             room.removeMember(ch);
-
             ch.setCurrentRoom(null);
-
-            // in Lobby
             joinRoom(DEFAULT_ROOM, ch);
         }
-
 
         broadcastRoomListToAll();
         broadcastRoomUsers(DEFAULT_ROOM);
         logger.info("ROOM_DELETE_ADMIN " + roomName);
         return true;
     }
+
 
 
 
@@ -429,5 +447,136 @@ public class ChatServer {
     public void logWarn(String msg) { logger.warn(msg); }
     public void logError(String msg) { logger.error(msg); }
 
+// ===== MS3: Dateien =====
+
+    public boolean roomExists(String room) {
+        if (room == null) return false;
+        return rooms.containsKey(room);
+    }
+
+    private Path roomDir(String room) {
+        // data/rooms/<room>
+        return roomsBaseDir.resolve(room).normalize();
+    }
+
+    public Path getRoomFilePath(String room, String filename) {
+        if (room == null || filename == null) return null;
+
+        Path dir = roomDir(room);
+        Path file = dir.resolve(filename).normalize();
+
+        // Safety: kein "../" aus dem base raus
+        if (!file.startsWith(dir)) return null;
+
+        return file;
+    }
+
+    public List<String> listFilesInRoom(String room) {
+        if (!roomExists(room)) return List.of();
+
+        Path dir = roomDir(room);
+        if (!Files.exists(dir) || !Files.isDirectory(dir)) return List.of();
+
+        List<String> out = new ArrayList<>();
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
+            for (Path p : ds) {
+                if (Files.isRegularFile(p)) {
+                    String name = p.getFileName().toString();
+                    // optional: tmp ausblenden
+                    if (name.endsWith(".tmp")) continue;
+                    out.add(name);
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("FILES_LIST_FAIL room=" + room + " err=" + e.getMessage());
+        }
+
+        out.sort(String::compareToIgnoreCase);
+        return out;
+    }
+
+    /**
+     * Speichert genau <size> Bytes aus dem Client-Stream nach data/rooms/<room>/<filename>.
+     * Liest EXAKT size Bytes (sonst wäre der Stream danach kaputt).
+     */
+    public boolean saveFileToRoom(String room, String filename, DataInputStream in, long size) {
+        if (!roomExists(room)) return false;
+        if (in == null) return false;
+        if (size < 0 || size > MAX_FILE_BYTES) return false;
+        if (!isValidFilename(filename)) return false;
+
+        try {
+            Files.createDirectories(roomsBaseDir);
+
+            Path dir = roomDir(room);
+            Files.createDirectories(dir);
+
+            Path target = getRoomFilePath(room, filename);
+            if (target == null) return false;
+
+            // temp schreiben und dann atomar ersetzen
+            Path tmp = dir.resolve(filename + ".tmp").normalize();
+            if (!tmp.startsWith(dir)) return false;
+
+            try (OutputStream fos = Files.newOutputStream(
+                    tmp,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            )) {
+                byte[] buf = new byte[8192];
+                long remaining = size;
+
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int r = in.read(buf, 0, toRead);
+                    if (r == -1) throw new EOFException("EOF während Upload");
+                    fos.write(buf, 0, r);
+                    remaining -= r;
+                }
+            }
+
+            Files.move(tmp, target,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+
+            logger.info("FILE_SAVED room=" + room + " file=" + filename + " size=" + size);
+            return true;
+
+        } catch (IOException e) {
+            logger.warn("FILE_SAVE_FAIL room=" + room + " file=" + filename + " err=" + e.getMessage());
+            return false;
+        }
+    }
+
+
+    private boolean isValidFilename(String s) {
+        if (s == null) return false;
+        if (s.isBlank()) return false;
+        if (s.contains("..")) return false;
+        if (s.contains("/") || s.contains("\\") ) return false;
+        if (s.contains("|") || s.contains(";")) return false;
+        if (s.contains(" ")) return false;
+        return true;
+    }
+
+    // Optional: Room-Folder beim Room-Delete entfernen
+    private void deleteRoomStorage(String roomName) {
+        if (!isValidRoomName(roomName)) return;
+        if (DEFAULT_ROOM.equals(roomName)) return;
+
+        Path dir = roomsBaseDir.resolve(roomName).normalize();
+        if (!dir.startsWith(roomsBaseDir)) return;
+        if (!Files.exists(dir)) return;
+
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted((a, b) -> Integer.compare(b.getNameCount(), a.getNameCount()))// erst Kinder, dann Eltern
+                    .forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (IOException ignore) {}
+                    });
+        } catch (IOException e) {
+            logger.error("DELETE_ROOM_STORAGE_FAILED room=" + roomName + " err=" + e.getMessage());
+        }
+    }
 
 }

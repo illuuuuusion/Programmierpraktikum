@@ -287,3 +287,15 @@
     - `listUsers()` → alle gespeicherten User für Admin/Debug anzeigen
     - `setBanned(username, banned)` → Bannstatus persistent setzen/entfernen
 - Konkrete Implementierung ist bei euch `FileUserRepository` (Datei-basiert), aber durch das Interface könnte man später leicht auf DB wechseln
+
+
+## In Studium/FortProg/FPP-Chatroom
+### Commands (kompilieren):
+- `mkdir -p out`                                     
+- `find src/main/java -name "*.java" > sources.txt`
+- `javac -d out @sources.txt`
+### Server:
+- `java -cp out de.uni_jena.fpp.chatroom.GuiServerMain`
+
+### Client:
+- `java -cp out de.uni_jena.fpp.chatroom.GuiClientMain`

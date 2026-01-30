@@ -1,10 +1,8 @@
 # username;iterations;saltBase64;hashBase64;banned
-abcdefg;120000;NN3nZhdnYOcCB19EQOPIEg==;FpAxe8cnuh9Fl25hZ2Ivv3N35keD1Bw1MIfj/QfwwHQ=;true
-elli;120000;dd2SqmrV45nWnQXTfueNMg==;6KmVMdGh/+CWNkLWGyh9MJyHskE6uRFlohRPQUSNgk4=;false
-halloho;120000;KHsmpODl9Qd3jiiIA41D+A==;UxL1/vmR+dgpP9IPUNb9aVr1yX/kWmhGtvUF0e/VfSo=;false
-hallona;120000;dwa/yDvBEMtwWsbGtsTThQ==;7xd29w1PHqZU8kPyKMMKYFLWQ5JtQTQ4zM7RFkzWb30=;false
-user1;120000;HyZcm9iWwmbspqQc/rNttg==;YbDo6f2S7eSy1rk+JP5mLQCl8cHj3YHKUbN83gWu00A=;false
-user18;120000;S4JYKVQuZ6OyK4uZ3wQ7ew==;L3MsM9oq5EV+IPq9951fhhVI7+m1GAgD6Ta5fKk7dIg=;false
-user2;120000;dkngjkuVZyXaJpckptcVBg==;Eyo8w2Sduo3eQpJoXdWbD5exfWGebmtbPONvFq8g/1A=;true
-user4;120000;f8ujBQPOvxIv3/yZWIwGaw==;NO9CpJdf0ysCqVH8YncdogtNnVnHitLeXDQ0ga69TsI=;false
-user5;120000;0NL5D7258l62xwTHcXuqVg==;XmTLrbxdhqvWu4YYuIqYyAxJfaGDjg1f7fhoa4n+7LQ=;false
+hali;120000;npGc7yKQHxBtGEzFd7KaCw==;jHaRPjut/17YnAByj3crLAnMVJAD14Qnpe852mEX6zU=;false
+hallo187;120000;FrATNqvcBa+nqE6Buu8gEg==;WpsQEagvpkubTxnduMlD8ZLCU10HQNeR9uKRz9ZgFH8=;false
+user1;120000;48gLTQ95lyKQ6/V4Q4wz/A==;b0VHKV0zIUgWjTGuuxqrrnh80NgvZZpdGXu5Lj+bPQ0=;true
+user2;120000;KHWfm2lTq96tB/YB3gQQkQ==;Hfs4N3VUNs14Uzy4TRFaH87kbnxl6twy47K9UyjL1ZU=;false
+user4;120000;m0on0Zm4QgfhYmjhcITRww==;NMVVSFIO1zgCPq3rnkNzDUgDkwSykEc8cEahzlSMNY0=;true
+user5;120000;4roxy7GrYI0CdimTQ8hbCw==;qtpAN8pf49Msvl9VLGHP/ubtyUSshI+BKEm++f7SKak=;false
+user6;120000;6aPtNLlOC3mdzvPsZs06UQ==;6RZz4SjYdN2+QSfw8B+AXP0NWM30yYLXIUyrz9bEGs8=;false

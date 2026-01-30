@@ -52,4 +52,41 @@ public class MessageFrame extends MainFrame {
         MessageFrame messageFrame = new MessageFrame();
         messageFrame.initialize(messageFrame, 0, 0);
     }
+
+    public void initialize(JFrame frame, String text) {
+
+        System.out.println(text);
+
+        JButton btnOK = new JButton("OK");
+        btnOK.setFont(MainFrame.mainFont);
+        btnOK.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                frame.dispose();
+            }
+        });
+
+        JPanel buttonsPanel = new JPanel();
+        buttonsPanel.add(btnOK);
+
+        JLabel lbMessage = new JLabel(text);
+        lbMessage.setFont(mainFont);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BorderLayout());
+        mainPanel.setBackground(mainColor);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+
+        mainPanel.add(lbMessage, BorderLayout.CENTER);
+        mainPanel.add(buttonsPanel, BorderLayout.SOUTH);
+
+        add(mainPanel);
+
+        setTitle("Meldung");
+        setMinimumSize(new Dimension(380, 150));
+        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        setVisible(true);
+        frame.pack();
+    }
+
 }

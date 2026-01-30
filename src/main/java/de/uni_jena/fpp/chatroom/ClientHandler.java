@@ -5,6 +5,12 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+
 
 public class ClientHandler extends Thread {
 
@@ -75,6 +81,12 @@ public class ClientHandler extends Thread {
             case Protocol.CMD_JOIN -> handleJoin(tokens);
             case Protocol.CMD_LEAVE -> handleLeave();
 
+            // MS3: Dateien
+            case Protocol.CMD_UPLOAD -> handleUpload(line);
+            case Protocol.CMD_FILES -> handleFiles(tokens);
+            case Protocol.CMD_DOWNLOAD -> handleDownload(tokens);
+
+
             case Protocol.CMD_MSG -> handleMsg(line);
             case Protocol.CMD_LOGOUT -> handleLogout();
 
@@ -92,6 +104,183 @@ public class ClientHandler extends Thread {
         server.logInfo("REGISTER user=" + tokens[1] + " ok=" + ok);
 
     }
+
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024; // 50 MB
+
+    private void handleUpload(String line) throws IOException {
+        if (!requireLogin()) return;
+
+        // UPLOAD <room> <filename> <size>
+        String[] t = line.trim().split("\\s+", 4);
+        if (t.length < 4) {
+            send(Protocol.RES_ERROR + " Usage: UPLOAD <room> <filename> <size>");
+            return;
+        }
+
+        String room = t[1];
+        String filename = t[2];
+
+        long size;
+        try {
+            size = Long.parseLong(t[3]);
+        } catch (NumberFormatException e) {
+            send(Protocol.buildUploadFailed("INVALID_SIZE"));
+            closeNow(); // Protokoll kaputt -> lieber trennen
+            return;
+        }
+
+        // harte Grenze
+        if (size < 0 || size > MAX_FILE_BYTES) {
+            send(Protocol.buildUploadFailed("SIZE_LIMIT"));
+            closeNow(); // sonst müsste man ggf. endlos Bytes weglesen
+            return;
+        }
+
+        if (currentRoom == null || !room.equals(currentRoom)) {
+            send(Protocol.buildUploadFailed("NOT_IN_ROOM"));
+            // Bytes weglesen (safe, weil size <= MAX_FILE_BYTES)
+            discardBytes(size);
+            return;
+        }
+
+        if (!server.roomExists(room)) {
+            send(Protocol.buildUploadFailed("ROOM_NOT_FOUND"));
+            discardBytes(size);
+            return;
+        }
+
+        if (!isValidFilename(filename)) {
+            send(Protocol.buildUploadFailed("INVALID_FILENAME"));
+            discardBytes(size);
+            return;
+        }
+
+        boolean ok = server.saveFileToRoom(room, filename, in, size);
+
+        if (ok) {
+            send(Protocol.buildUploadOk(filename));
+            server.logInfo("UPLOAD user=" + displayName + " room=" + room + " file=" + filename + " size=" + size + " ok=true");
+        } else {
+            send(Protocol.buildUploadFailed("SAVE_FAILED"));
+            server.logWarn("UPLOAD_FAIL user=" + displayName + " room=" + room + " file=" + filename + " size=" + size);
+            closeNow();
+        }
+    }
+
+    private void handleFiles(String[] tokens) throws IOException {
+        if (!requireLogin()) return;
+
+        // FILES <room>
+        if (tokens.length < 2) {
+            send(Protocol.RES_ERROR + " Usage: FILES <room>");
+            return;
+        }
+
+        String room = tokens[1];
+
+        if (currentRoom == null || !room.equals(currentRoom)) {
+            send(Protocol.RES_ERROR + " Du bist nicht in diesem Raum.");
+            return;
+        }
+
+        if (!server.roomExists(room)) {
+            send(Protocol.RES_ERROR + " Raum existiert nicht.");
+            return;
+        }
+
+        List<String> files = server.listFilesInRoom(room);
+        send(Protocol.buildFileList(room, files));
+    }
+
+    private void handleDownload(String[] tokens) throws IOException {
+        if (!requireLogin()) return;
+
+        // DOWNLOAD <room> <filename>
+        if (tokens.length < 3) {
+            send(Protocol.RES_ERROR + " Usage: DOWNLOAD <room> <filename>");
+            return;
+        }
+
+        String room = tokens[1];
+        String filename = tokens[2];
+
+        if (currentRoom == null || !room.equals(currentRoom)) {
+            send(Protocol.buildDownloadFailed("NOT_IN_ROOM"));
+            return;
+        }
+
+        if (!server.roomExists(room)) {
+            send(Protocol.buildDownloadFailed("ROOM_NOT_FOUND"));
+            return;
+        }
+
+        if (!isValidFilename(filename)) {
+            send(Protocol.buildDownloadFailed("INVALID_FILENAME"));
+            return;
+        }
+
+        Path file = server.getRoomFilePath(room, filename);
+        if (file == null || !Files.exists(file) || !Files.isRegularFile(file)) {
+            send(Protocol.buildDownloadFailed("NOT_FOUND"));
+            return;
+        }
+
+        long size = Files.size(file);
+        if (size < 0 || size > MAX_FILE_BYTES) {
+            send(Protocol.buildDownloadFailed("SIZE_LIMIT"));
+            return;
+        }
+
+        sendFileBytes(file, filename, size);
+        server.logInfo("DOWNLOAD user=" + displayName + " room=" + room + " file=" + filename + " size=" + size);
+    }
+
+    private void sendFileBytes(Path file, String filename, long size) throws IOException {
+        // Wichtig: Header + Bytes müssen ohne Interleaving rausgehen.
+        synchronized (this) {
+            out.writeUTF(Protocol.buildFileHeader(filename, size));
+            out.flush();
+
+            try (InputStream fis = Files.newInputStream(file)) {
+                byte[] buf = new byte[8192];
+                long remaining = size;
+
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int r = fis.read(buf, 0, toRead);
+                    if (r == -1) throw new IOException("EOF beim Lesen der Datei");
+                    out.write(buf, 0, r);
+                    remaining -= r;
+                }
+            }
+            out.flush();
+        }
+    }
+
+    private void discardBytes(long size) throws IOException {
+        if (size <= 0) return;
+        long remaining = size;
+        byte[] buf = new byte[8192];
+
+        while (remaining > 0) {
+            int toRead = (int) Math.min(buf.length, remaining);
+            int r = in.read(buf, 0, toRead);
+            if (r == -1) throw new EOFException("EOF while discarding upload bytes");
+            remaining -= r;
+        }
+    }
+
+    private boolean isValidFilename(String s) {
+        if (s == null) return false;
+        if (s.isBlank()) return false;
+        if (s.contains("..")) return false;
+        if (s.contains("/") || s.contains("\\")) return false;
+        if (s.contains("|") || s.contains(";")) return false;
+        if (s.contains(" ")) return false;
+        return true;
+    }
+
+
 
     private void handleLogin(String[] tokens) throws IOException {
         if (tokens.length < 3) {

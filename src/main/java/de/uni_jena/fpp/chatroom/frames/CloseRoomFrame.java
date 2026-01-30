@@ -50,6 +50,7 @@ public class CloseRoomFrame extends MainFrame {
 
         JPanel buttonsPanel = new JPanel();
         buttonsPanel.setLayout(new GridLayout(1, 2));
+        buttonsPanel.setOpaque(false);
         buttonsPanel.add(btnConfirm);
         buttonsPanel.add(btnCancel);
 

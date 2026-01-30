@@ -19,5 +19,9 @@ public interface ChatClientListener {
     default void onBanned(String reason) {}
 
     default void onConnectionClosed() {}
+    default void onFileList(String room, List<String> files) {}
+    default void onFilesUpdated(String room, List<String> files) {}
+
+
 }
 

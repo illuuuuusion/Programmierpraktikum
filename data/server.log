@@ -1,152 +1,150 @@
-2026-01-15 21:54:52 [INFO] Config: port=5001 users.file=data/users.db log.file=data/server.log
-2026-01-15 21:54:52 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-15 21:54:52 [INFO] Warte auf eingehende Clients ...
-2026-01-15 21:55:01 [INFO] CONNECT id=1 addr=/127.0.0.1:51114
-2026-01-15 21:55:16 [INFO] REGISTER user=user1 ok=true
-2026-01-15 21:55:18 [INFO] LOGIN_OK user=user1
-2026-01-15 21:55:23 [INFO] MSG room=Lobby from=user1 len=5
-2026-01-15 21:55:32 [INFO] MSG room=Lobby from=user1 len=5
-2026-01-15 21:55:39 [INFO] ROOM_CREATE Hallo1
-2026-01-15 21:55:39 [INFO] CREATE_ROOM by=user1 room=Hallo1 ok=true
-2026-01-15 21:55:44 [INFO] JOIN user=user1 room=Hallo1 ok=true
-2026-01-15 21:55:47 [INFO] MSG room=Hallo1 from=user1 len=5
-2026-01-15 21:55:53 [INFO] MSG room=Hallo1 from=user1 len=5
-2026-01-15 21:55:58 [INFO] ROOM_DELETE Hallo1
-2026-01-15 21:56:09 [INFO] MSG room=Lobby from=user1 len=5
-2026-01-15 21:56:45 [INFO] MSG room=Lobby from=user1 len=4
-2026-01-15 22:02:36 [INFO] DISCONNECT user1 (active=0)
-2026-01-15 22:11:12 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-15 22:11:12 [INFO] Warte auf eingehende Clients ...
-2026-01-15 22:11:18 [INFO] CONNECT id=1 addr=/127.0.0.1:51407
-2026-01-15 22:11:27 [INFO] REGISTER user=user5 ok=true
-2026-01-15 22:11:30 [INFO] LOGIN_OK user=user5
-2026-01-15 22:11:59 [INFO] ROOM_CREATE room2
-2026-01-15 22:11:59 [INFO] CREATE_ROOM by=user5 room=room2 ok=true
-2026-01-15 22:12:02 [INFO] JOIN user=user5 room=room2 ok=true
-2026-01-15 22:50:10 [INFO] Stop requested
-2026-01-15 22:52:33 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-15 22:52:33 [INFO] Warte auf eingehende Clients ...
-2026-01-15 22:52:41 [INFO] CONNECT id=1 addr=/127.0.0.1:51551
-2026-01-15 22:52:50 [INFO] REGISTER user=abcdefg ok=true
-2026-01-15 22:52:52 [INFO] LOGIN_OK user=abcdefg
-2026-01-15 22:53:15 [WARN] WARN user=abcdefg text=Hier ist eine Warnung
-2026-01-15 22:53:28 [WARN] BAN user=abcdefg reason=Warnung nicht eingehalten
-2026-01-15 22:53:28 [INFO] DISCONNECT abcdefg (active=0)
-2026-01-15 22:53:44 [INFO] CONNECT id=2 addr=/127.0.0.1:51555
-2026-01-15 22:53:52 [INFO] REGISTER user=abcdefg ok=false
-2026-01-15 22:53:54 [WARN] LOGIN_BANNED user=abcdefg
-2026-01-15 22:53:54 [INFO] DISCONNECT client-ClientHandler-2 (active=0)
-2026-01-15 22:54:12 [INFO] CONNECT id=3 addr=/127.0.0.1:51563
-2026-01-15 22:54:51 [INFO] REGISTER user=user4 ok=true
-2026-01-15 22:54:53 [INFO] LOGIN_OK user=user4
-2026-01-15 22:55:02 [INFO] MSG room=Lobby from=user4 len=5
-2026-01-15 22:55:09 [INFO] ROOM_CREATE hallo
-2026-01-15 22:55:09 [INFO] CREATE_ROOM by=user4 room=hallo ok=true
-2026-01-15 22:55:13 [INFO] JOIN user=user4 room=hallo ok=true
-2026-01-15 22:55:29 [INFO] ROOM_DELETE hallo
-2026-01-15 22:55:38 [INFO] ROOM_CREATE halloo
-2026-01-15 22:55:38 [INFO] CREATE_ROOM by=user4 room=halloo ok=true
-2026-01-15 22:55:41 [INFO] JOIN user=user4 room=halloo ok=true
-2026-01-15 22:56:20 [INFO] ROOM_DELETE halloo
-2026-01-15 22:56:31 [INFO] MSG room=Lobby from=user4 len=5
-2026-01-15 22:57:29 [INFO] Stop requested
-2026-01-15 22:57:40 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-15 22:57:40 [INFO] Warte auf eingehende Clients ...
-2026-01-15 23:00:39 [INFO] Stop requested
-2026-01-15 23:00:54 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-15 23:00:54 [INFO] Warte auf eingehende Clients ...
-2026-01-15 23:00:59 [INFO] CONNECT id=1 addr=/127.0.0.1:51605
-2026-01-15 23:01:10 [INFO] REGISTER user=elli ok=true
-2026-01-15 23:01:11 [INFO] LOGIN_OK user=elli
-2026-01-15 23:01:15 [INFO] MSG room=Lobby from=elli len=5
-2026-01-15 23:01:28 [INFO] ROOM_CREATE Nadme
-2026-01-15 23:01:28 [INFO] CREATE_ROOM by=elli room=Nadme ok=true
-2026-01-15 23:21:39 [INFO] Stop requested
-2026-01-16 01:05:49 [INFO] Server startet (Multi-Client) auf Port 5000
-2026-01-16 01:05:49 [ERROR] ServerSocket Fehler: Address already in use
-2026-01-16 01:05:49 [INFO] Server beendet.
-2026-01-16 01:06:20 [INFO] Stop requested
-2026-01-16 01:12:00 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:12:00 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:13:59 [INFO] CONNECT id=1 addr=/127.0.0.1:52301
-2026-01-16 01:14:06 [INFO] LOGIN_FAIL user=halloho
-2026-01-16 01:14:09 [INFO] REGISTER user=halloho ok=true
-2026-01-16 01:14:11 [INFO] LOGIN_OK user=halloho
-2026-01-16 01:14:32 [WARN] WARN user=halloho text=du kleiner schlingel
-2026-01-16 01:14:48 [INFO] CONNECT id=2 addr=/127.0.0.1:52312
-2026-01-16 01:15:03 [INFO] LOGIN_FAIL user=halloho
-2026-01-16 01:15:14 [INFO] REGISTER user=halloho ok=false
-2026-01-16 01:15:16 [INFO] REGISTER user=halloho ok=false
-2026-01-16 01:15:26 [INFO] REGISTER user=user2 ok=true
-2026-01-16 01:15:28 [INFO] LOGIN_OK user=user2
-2026-01-16 01:15:41 [INFO] ROOM_CREATE Raum1
-2026-01-16 01:15:41 [INFO] CREATE_ROOM by=halloho room=Raum1 ok=true
-2026-01-16 01:15:50 [INFO] JOIN user=halloho room=Raum1 ok=true
-2026-01-16 01:15:55 [INFO] MSG room=Lobby from=user2 len=5
-2026-01-16 01:15:59 [INFO] JOIN user=user2 room=Raum1 ok=true
-2026-01-16 01:16:08 [INFO] MSG room=Raum1 from=user2 len=5
-2026-01-16 01:17:11 [WARN] BAN user=user2 reason=na hör mal
-2026-01-16 01:17:11 [INFO] DISCONNECT user2 (active=1)
-2026-01-16 01:17:22 [INFO] Stop requested
-2026-01-16 01:17:22 [INFO] ServerSocket geschlossen (stop).
-2026-01-16 01:17:22 [INFO] Server beendet.
-2026-01-16 01:17:27 [INFO] MSG room=Raum1 from=halloho len=5
-2026-01-16 01:17:45 [INFO] ROOM_CREATE sdf
-2026-01-16 01:17:45 [INFO] CREATE_ROOM by=halloho room=sdf ok=true
-2026-01-16 01:17:47 [INFO] ROOM_DELETE Raum1
-2026-01-16 01:17:47 [INFO] JOIN user=halloho room=sdf ok=true
-2026-01-16 01:20:44 [INFO] Stop requested
-2026-01-16 01:22:38 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:22:38 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:22:38 [INFO] Stop requested
-2026-01-16 01:22:38 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:22:38 [INFO] ServerSocket geschlossen (stop).
-2026-01-16 01:22:38 [INFO] Server beendet.
-2026-01-16 01:22:40 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:22:40 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:22:47 [INFO] CONNECT id=1 addr=/127.0.0.1:52348
-2026-01-16 01:22:54 [INFO] REGISTER user=hallona ok=true
-2026-01-16 01:22:56 [INFO] LOGIN_OK user=hallona
-2026-01-16 01:22:59 [INFO] Stop requested
-2026-01-16 01:22:59 [INFO] ServerSocket geschlossen (stop).
-2026-01-16 01:22:59 [INFO] Server beendet.
-2026-01-16 01:22:59 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:22:59 [INFO] DISCONNECT hallona (active=0)
-2026-01-16 01:23:13 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:23:13 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:23:25 [INFO] CONNECT id=2 addr=/127.0.0.1:52349
-2026-01-16 01:23:30 [INFO] LOGIN_OK user=hallona
-2026-01-16 01:40:31 [INFO] ROOM_CREATE_ADMIN Ookokok
-2026-01-16 01:40:37 [INFO] ROOM_DELETE_ADMIN Ookokok
-2026-01-16 01:40:44 [INFO] ROOM_CREATE_ADMIN ayo
-2026-01-16 01:40:51 [INFO] ROOM_CREATE asd
-2026-01-16 01:40:51 [INFO] CREATE_ROOM by=hallona room=asd ok=true
-2026-01-16 01:40:58 [INFO] DISCONNECT hallona (active=0)
-2026-01-16 01:40:59 [INFO] Stop requested (already stopped)
-2026-01-16 01:40:59 [INFO] Stop requested
-2026-01-16 01:40:59 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:41:01 [INFO] Stop requested
-2026-01-16 01:41:01 [INFO] ServerSocket geschlossen (stop).
-2026-01-16 01:41:01 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:41:01 [INFO] Server beendet.
-2026-01-16 01:42:36 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:42:36 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:42:38 [INFO] CONNECT id=1 addr=/127.0.0.1:52425
-2026-01-16 01:42:46 [INFO] REGISTER user=user18 ok=true
-2026-01-16 01:42:48 [INFO] LOGIN_OK user=user18
-2026-01-16 01:42:55 [INFO] ROOM_CREATE_ADMIN asdas
-2026-01-16 01:42:57 [INFO] JOIN user=user18 room=asdas ok=true
-2026-01-16 01:43:04 [INFO] JOIN user=user18 room=asdas ok=true
-2026-01-16 01:43:15 [INFO] MSG room=asdas from=user18 len=5
-2026-01-16 01:44:05 [INFO] ROOM_DELETE_ADMIN asdas
-2026-01-16 01:44:11 [INFO] MSG room=Lobby from=user18 len=5
-2026-01-16 01:44:20 [INFO] Stop requested
-2026-01-16 01:44:20 [INFO] ServerSocket geschlossen (stop).
-2026-01-16 01:44:20 [INFO] Server beendet.
-2026-01-16 01:44:20 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:44:20 [INFO] DISCONNECT user18 (active=0)
-2026-01-16 01:44:24 [INFO] Server startet (Multi-Client) auf Port 5001
-2026-01-16 01:44:24 [INFO] Warte auf eingehende Clients ...
-2026-01-16 01:44:58 [INFO] Stop requested
-2026-01-16 01:44:58 [INFO] Stop komplett (clients geschlossen)
-2026-01-16 01:44:58 [INFO] ServerSocket geschlossen (stop).
+2026-01-16 10:21:25 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-16 10:21:25 [INFO] Warte auf eingehende Clients ...
+2026-01-16 10:21:27 [INFO] CONNECT id=1 addr=/127.0.0.1:53897
+2026-01-16 10:21:35 [INFO] REGISTER user=user1 ok=true
+2026-01-16 10:21:40 [INFO] LOGIN_OK user=user1
+2026-01-16 10:21:52 [INFO] MSG room=Lobby from=user1 len=3
+2026-01-16 10:22:04 [INFO] ROOM_CREATE room1
+2026-01-16 10:22:04 [INFO] CREATE_ROOM by=user1 room=room1 ok=true
+2026-01-16 10:22:11 [INFO] MSG room=Lobby from=user1 len=3
+2026-01-16 10:22:15 [INFO] JOIN user=user1 room=room1 ok=true
+2026-01-16 10:22:26 [INFO] MSG room=room1 from=user1 len=3
+2026-01-16 10:22:30 [INFO] ROOM_DELETE room1
+2026-01-16 10:22:38 [INFO] ROOM_CREATE_ADMIN room1
+2026-01-16 10:22:41 [INFO] JOIN user=user1 room=room1 ok=true
+2026-01-16 10:23:39 [INFO] ROOM_DELETE_ADMIN room1
+2026-01-16 10:23:51 [WARN] WARN user=user1 text=schlingel
+2026-01-16 10:24:00 [WARN] BAN user=user1 reason=schlingel
+2026-01-16 10:24:00 [INFO] DISCONNECT user1 (active=0)
+2026-01-16 10:24:26 [INFO] Stop requested
+2026-01-16 10:24:26 [INFO] Stop komplett (clients geschlossen)
+2026-01-16 10:24:26 [INFO] ServerSocket geschlossen (stop).
+2026-01-16 10:24:40 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-16 10:24:40 [INFO] Warte auf eingehende Clients ...
+2026-01-16 10:24:42 [INFO] CONNECT id=1 addr=/127.0.0.1:53904
+2026-01-16 10:24:48 [INFO] REGISTER user=user1 ok=false
+2026-01-16 10:24:53 [WARN] LOGIN_BANNED user=user1
+2026-01-16 10:24:53 [INFO] DISCONNECT client-ClientHandler-1 (active=0)
+2026-01-16 10:25:05 [INFO] CONNECT id=2 addr=/127.0.0.1:53905
+2026-01-16 10:25:09 [INFO] REGISTER user=user2 ok=true
+2026-01-16 10:25:12 [INFO] LOGIN_OK user=user2
+2026-01-16 10:25:32 [INFO] ROOM_CREATE roon1
+2026-01-16 10:25:32 [INFO] CREATE_ROOM by=user2 room=roon1 ok=true
+2026-01-16 10:26:52 [INFO] DISCONNECT user2 (active=0)
+2026-01-16 10:26:53 [INFO] Stop requested
+2026-01-16 10:26:53 [INFO] Stop komplett (clients geschlossen)
+2026-01-16 10:26:59 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-16 10:26:59 [INFO] Warte auf eingehende Clients ...
+2026-01-16 10:27:01 [INFO] CONNECT id=1 addr=/127.0.0.1:53908
+2026-01-16 10:27:06 [INFO] LOGIN_OK user=user2
+2026-01-16 10:27:12 [INFO] ROOM_CREATE hallo
+2026-01-16 10:27:12 [INFO] CREATE_ROOM by=user2 room=hallo ok=true
+2026-01-16 10:29:51 [INFO] Stop requested
+2026-01-16 10:29:51 [INFO] ServerSocket geschlossen (stop).
+2026-01-16 10:29:51 [INFO] Server beendet.
+2026-01-16 10:29:51 [INFO] Stop komplett (clients geschlossen)
+2026-01-16 10:30:01 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-16 10:30:01 [INFO] Warte auf eingehende Clients ...
+2026-01-16 10:30:03 [INFO] CONNECT id=1 addr=/127.0.0.1:53913
+2026-01-16 10:30:11 [INFO] LOGIN_OK user=user2
+2026-01-16 10:30:31 [INFO] Stop requested
+2026-01-16 10:30:31 [INFO] ServerSocket geschlossen (stop).
+2026-01-16 10:30:31 [INFO] Server beendet.
+2026-01-16 10:30:31 [INFO] Stop komplett (clients geschlossen)
+2026-01-16 10:31:09 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-16 10:31:09 [INFO] Warte auf eingehende Clients ...
+2026-01-16 10:31:11 [INFO] CONNECT id=1 addr=/127.0.0.1:53917
+2026-01-16 10:31:20 [INFO] REGISTER user=user4 ok=true
+2026-01-16 10:31:28 [INFO] LOGIN_OK user=user4
+2026-01-16 10:31:41 [INFO] ROOM_CREATE room1
+2026-01-16 10:31:41 [INFO] CREATE_ROOM by=user4 room=room1 ok=true
+2026-01-16 10:31:45 [INFO] JOIN user=user4 room=room1 ok=true
+2026-01-16 10:31:51 [INFO] MSG room=room1 from=user4 len=4
+2026-01-16 10:31:59 [INFO] ROOM_DELETE room1
+2026-01-16 10:32:16 [INFO] MSG room=Lobby from=user4 len=8
+2026-01-16 10:32:53 [INFO] ROOM_CREATE_ADMIN room2
+2026-01-16 10:32:58 [INFO] JOIN user=user4 room=room2 ok=true
+2026-01-16 10:33:06 [INFO] ROOM_DELETE_ADMIN room2
+2026-01-16 10:33:23 [WARN] WARN user=user4 text=warn
+2026-01-16 10:33:39 [WARN] BAN user=user4 reason=bangrund
+2026-01-16 10:33:39 [INFO] DISCONNECT user4 (active=0)
+2026-01-16 10:33:55 [INFO] CONNECT id=2 addr=/127.0.0.1:53925
+2026-01-16 10:34:04 [INFO] REGISTER user=user4 ok=false
+2026-01-16 10:34:08 [WARN] LOGIN_BANNED user=user4
+2026-01-16 10:34:08 [INFO] DISCONNECT client-ClientHandler-2 (active=0)
+2026-01-16 10:34:16 [INFO] CONNECT id=3 addr=/127.0.0.1:53926
+2026-01-16 10:34:23 [INFO] REGISTER user=user5 ok=true
+2026-01-16 10:34:25 [INFO] LOGIN_OK user=user5
+2026-01-16 10:34:29 [INFO] CONNECT id=4 addr=/127.0.0.1:53927
+2026-01-16 10:34:35 [INFO] REGISTER user=user6 ok=true
+2026-01-16 10:34:36 [INFO] LOGIN_OK user=user6
+2026-01-16 10:34:56 [INFO] ROOM_CREATE room1
+2026-01-16 10:34:56 [INFO] CREATE_ROOM by=user5 room=room1 ok=true
+2026-01-16 10:35:02 [INFO] JOIN user=user6 room=room1 ok=true
+2026-01-16 10:35:04 [INFO] JOIN user=user5 room=room1 ok=true
+2026-01-16 10:35:09 [INFO] MSG room=room1 from=user6 len=4
+2026-01-16 10:35:34 [INFO] ROOM_DELETE_ADMIN room1
+2026-01-16 10:37:08 [INFO] ROOM_CREATE room1
+2026-01-16 10:37:08 [INFO] CREATE_ROOM by=user5 room=room1 ok=true
+2026-01-16 10:37:12 [INFO] MSG room=Lobby from=user5 len=3
+2026-01-16 10:37:15 [INFO] JOIN user=user5 room=room1 ok=true
+2026-01-16 10:39:56 [INFO] Stop requested
+2026-01-16 10:39:56 [INFO] ServerSocket geschlossen (stop).
+2026-01-16 10:39:56 [INFO] Server beendet.
+2026-01-16 10:39:56 [INFO] DISCONNECT user5 (active=1)
+2026-01-16 10:39:56 [INFO] DISCONNECT user6 (active=0)
+2026-01-16 10:39:56 [INFO] Stop komplett (clients geschlossen)
+2026-01-19 17:48:59 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-19 17:48:59 [INFO] Warte auf eingehende Clients ...
+2026-01-19 17:49:28 [INFO] CONNECT id=1 addr=/127.0.0.1:65535
+2026-01-19 17:49:35 [INFO] REGISTER user=hali ok=true
+2026-01-19 17:49:37 [INFO] LOGIN_OK user=hali
+2026-01-19 17:49:45 [INFO] MSG room=Lobby from=hali len=3
+2026-01-19 17:49:51 [INFO] ROOM_CREATE asd
+2026-01-19 17:49:51 [INFO] CREATE_ROOM by=hali room=asd ok=true
+2026-01-19 17:49:56 [INFO] JOIN user=hali room=asd ok=true
+2026-01-19 17:50:00 [INFO] FILE_SAVED room=asd file=cover.pdf size=290764
+2026-01-19 17:50:00 [INFO] UPLOAD user=hali room=asd file=cover.pdf size=290764 ok=true
+2026-01-19 17:50:03 [INFO] DOWNLOAD user=hali room=asd file=cover.pdf size=290764
+2026-01-19 17:50:17 [INFO] ROOM_DELETE asd
+2026-01-19 17:50:17 [INFO] JOIN user=hali room=Lobby ok=true
+2026-01-19 17:50:24 [INFO] FILE_SAVED room=Lobby file=cover.pdf size=290764
+2026-01-19 17:50:24 [INFO] UPLOAD user=hali room=Lobby file=cover.pdf size=290764 ok=true
+2026-01-19 18:36:26 [INFO] Stop requested
+2026-01-19 18:36:26 [INFO] ServerSocket geschlossen (stop).
+2026-01-19 18:36:26 [INFO] Server beendet.
+2026-01-19 18:36:26 [INFO] Stop komplett (clients geschlossen)
+2026-01-23 13:04:21 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-01-23 13:04:21 [INFO] Warte auf eingehende Clients ...
+2026-01-23 13:04:36 [INFO] CONNECT id=1 addr=/127.0.0.1:58325
+2026-01-23 13:04:43 [INFO] REGISTER user=hallo187 ok=true
+2026-01-23 13:04:45 [INFO] LOGIN_OK user=hallo187
+2026-01-23 13:04:57 [INFO] DOWNLOAD user=hallo187 room=Lobby file=cover.pdf size=290764
+2026-01-23 13:05:43 [INFO] FILE_SAVED room=Lobby file=cover.pdf size=290764
+2026-01-23 13:05:43 [INFO] UPLOAD user=hallo187 room=Lobby file=cover.pdf size=290764 ok=true
+2026-01-23 13:05:51 [INFO] DOWNLOAD user=hallo187 room=Lobby file=cover.pdf size=290764
+2026-01-23 13:05:58 [INFO] FILE_SAVED room=Lobby file=sources.txt size=0
+2026-01-23 13:05:58 [INFO] UPLOAD user=hallo187 room=Lobby file=sources.txt size=0 ok=true
+2026-01-23 13:06:34 [INFO] FILE_SAVED room=Lobby file=Abstract_KloeserJamie.txt size=1141
+2026-01-23 13:06:34 [INFO] UPLOAD user=hallo187 room=Lobby file=Abstract_KloeserJamie.txt size=1141 ok=true
+2026-01-23 13:06:38 [INFO] FILE_SAVED room=Lobby file=Abstract_KloeserJamie.pdf size=22692
+2026-01-23 13:06:38 [INFO] UPLOAD user=hallo187 room=Lobby file=Abstract_KloeserJamie.pdf size=22692 ok=true
+2026-01-23 13:06:49 [INFO] FILE_SAVED room=Lobby file=index.html size=4356
+2026-01-23 13:06:49 [INFO] UPLOAD user=hallo187 room=Lobby file=index.html size=4356 ok=true
+2026-01-23 13:07:01 [INFO] FILE_SAVED room=Lobby file=Stundenplan.xlsx size=13785
+2026-01-23 13:07:01 [INFO] UPLOAD user=hallo187 room=Lobby file=Stundenplan.xlsx size=13785 ok=true
+2026-01-23 13:07:24 [INFO] ROOM_CREATE halo
+2026-01-23 13:07:24 [INFO] CREATE_ROOM by=hallo187 room=halo ok=true
+2026-01-23 13:07:27 [INFO] JOIN user=hallo187 room=halo ok=true
+2026-01-23 13:27:02 [INFO] FILE_SAVED room=halo file=cover.pdf size=290764
+2026-01-23 13:27:02 [INFO] UPLOAD user=hallo187 room=halo file=cover.pdf size=290764 ok=true
+2026-01-23 13:27:10 [INFO] ROOM_DELETE_ADMIN halo
+2026-01-23 13:31:11 [INFO] ROOM_CREATE joo
+2026-01-23 13:31:11 [INFO] CREATE_ROOM by=hallo187 room=joo ok=true
+2026-01-23 13:31:58 [INFO] JOIN user=hallo187 room=joo ok=true
+2026-01-23 13:32:09 [INFO] FILE_SAVED room=joo file=cover.pdf size=290764
+2026-01-23 13:32:09 [INFO] UPLOAD user=hallo187 room=joo file=cover.pdf size=290764 ok=true
+2026-01-23 13:34:16 [INFO] ROOM_DELETE joo
+2026-01-23 13:41:34 [INFO] DISCONNECT hallo187 (active=0)
+2026-01-23 13:41:40 [INFO] Stop requested
+2026-01-23 13:41:40 [INFO] Stop komplett (clients geschlossen)

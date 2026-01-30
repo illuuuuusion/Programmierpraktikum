@@ -38,6 +38,22 @@ public final class Protocol {
 
     private static final String LIST_DELIM = "|";
 
+    // MS3
+// Client -> Server
+    public static final String CMD_UPLOAD   = "UPLOAD";    // UPLOAD <room> <filename> <size>  + raw bytes
+    public static final String CMD_FILES    = "FILES";     // FILES <room>
+    public static final String CMD_DOWNLOAD = "DOWNLOAD";  // DOWNLOAD <room> <filename>
+
+    // Server -> Client
+    public static final String RES_UPLOAD_OK      = "UPLOAD_OK";      // UPLOAD_OK <filename>
+    public static final String RES_UPLOAD_FAILED  = "UPLOAD_FAILED";  // UPLOAD_FAILED <reason...>
+
+    public static final String RES_FILE_LIST      = "FILE_LIST";      // FILE_LIST <room> <file1>|<file2>|...
+    public static final String RES_FILE           = "FILE";           // FILE <filename> <size> + raw bytes
+    public static final String RES_DOWNLOAD_FAILED = "DOWNLOAD_FAILED"; // DOWNLOAD_FAILED <reason...>
+
+
+
     private Protocol() {}
 
     /**
@@ -110,6 +126,42 @@ public final class Protocol {
 
     public static String buildBanned(String reason) {
         return RES_BANNED + " " + (reason == null ? "" : reason);
+    }
+
+    // Builder: Client -> Server (MS3)
+    public static String buildUpload(String room, String filename, long size) {
+        return CMD_UPLOAD + " " + room + " " + filename + " " + size;
+    }
+
+    public static String buildFiles(String room) {
+        return CMD_FILES + " " + room;
+    }
+
+    public static String buildDownload(String room, String filename) {
+        return CMD_DOWNLOAD + " " + room + " " + filename;
+    }
+
+    public static String buildUploadOk(String filename) {
+        return RES_UPLOAD_OK + " " + filename;
+    }
+
+    public static String buildUploadFailed(String reason) {
+        return RES_UPLOAD_FAILED + " " + (reason == null ? "" : reason);
+    }
+
+    public static String buildFileList(String room, List<String> files) {
+        String payload = String.join(LIST_DELIM, files);
+        return payload.isEmpty()
+                ? (RES_FILE_LIST + " " + room)
+                : (RES_FILE_LIST + " " + room + " " + payload);
+    }
+
+    public static String buildFileHeader(String filename, long size) {
+        return RES_FILE + " " + filename + " " + size;
+    }
+
+    public static String buildDownloadFailed(String reason) {
+        return RES_DOWNLOAD_FAILED + " " + (reason == null ? "" : reason);
     }
 
 
