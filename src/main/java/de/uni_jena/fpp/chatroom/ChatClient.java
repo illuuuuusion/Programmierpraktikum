@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ChatClient {
+    private volatile String username;
+    public String getUsername(){
+        return username;
+    }
 
     private final String host;
     private final int port;
@@ -41,7 +45,7 @@ public class ChatClient {
         listeners.remove(l);
     }
 
-    // Connection API (für GUI)
+    // Connection API für gui
     public void connect() throws IOException {
         socket = new Socket(host, port);
         in = new DataInputStream(socket.getInputStream());
@@ -60,12 +64,13 @@ public class ChatClient {
         fireConnectionClosed();
     }
 
-    // Actions (für UI)
+    // Actions für UI
     public void register(String username, String password) throws IOException {
         send(Protocol.buildRegister(username, password));
     }
 
     public void login(String username, String password) throws IOException {
+        this.username = username;
         send(Protocol.buildLogin(username, password));
     }
 
@@ -89,7 +94,6 @@ public class ChatClient {
         send(Protocol.buildLogout());
     }
 
-    // Debug-Konsole bleibt (start())
     public void start() {
         try {
             connect();
@@ -127,7 +131,7 @@ public class ChatClient {
     }
 
     private void handleServerMessage(String line) {
-        // CHAT <room> <from> <text...> (4 tokens) :contentReference[oaicite:2]{index=2}
+        // CHAT <room> <from> <text...> (4 tokens)
         if (line.startsWith(Protocol.RES_CHAT + " ")) {
             String[] t = line.split("\\s+", 4);
             if (t.length >= 4) {
@@ -196,14 +200,8 @@ public class ChatClient {
                 boolean roomChanged = (cur == null || cur.isBlank() || !cur.equals(room));
 
                 if (roomChanged) {
-                    model.setCurrentRoom(room); // cleared users/files -> OK
-                    // automatisch Files für den neuen Raum laden
-                    try {
-                        listFiles(room);
-                    } catch (IOException ex) {
-                        model.addChatLine("[ERROR] FILES: " + ex.getMessage());
-                        fireError("FILES: " + ex.getMessage());
-                    }
+                    model.setCurrentRoom(room); // cleared users/files
+
                 }
                 model.setUsersInCurrentRoom(users);
                 fireUsersUpdated(room, users);
@@ -225,7 +223,6 @@ public class ChatClient {
             case Protocol.RES_INFO -> {
                 String txt = payload(tokens);
 
-                // Fallback: Server sagt explizit "Joined <room>"
                 if (txt != null && txt.startsWith("Joined ")) {
                     String room = txt.substring("Joined ".length()).trim();
                     if (!room.isBlank()) {
@@ -233,12 +230,6 @@ public class ChatClient {
                         boolean roomChanged = (cur == null || cur.isBlank() || !cur.equals(room));
                         if (roomChanged) {
                             model.setCurrentRoom(room);
-                            try {
-                                listFiles(room);
-                            } catch (IOException ex) {
-                                model.addChatLine("[ERROR] FILES: " + ex.getMessage());
-                                fireError("FILES: " + ex.getMessage());
-                            }
                         }
                     }
                 }
@@ -246,7 +237,6 @@ public class ChatClient {
                 model.addChatLine("[INFO] " + txt);
                 fireInfo(txt);
             }
-
 
             case Protocol.RES_ERROR -> {
                 String txt = payload(tokens);
@@ -267,7 +257,6 @@ public class ChatClient {
                 fireFileList(room, files);
             }
 
-
             case Protocol.RES_UPLOAD_OK -> {
                 String fn = (tokens.length >= 2) ? tokens[1] : "?";
                 model.addChatLine("[INFO] Upload OK: " + fn);
@@ -286,9 +275,7 @@ public class ChatClient {
                 fireError("Download failed: " + reason);
             }
 
-
             default -> {
-                // Für Debug: unbekannte Servermessage anzeigen
                 model.addChatLine("[SERVER] " + line);
                 fireInfo(line);
             }
@@ -406,19 +393,15 @@ public class ChatClient {
     private void fireInfo(String text) {
         for (ChatClientListener l : listeners) l.onInfo(text);
     }
-
     private void fireError(String text) {
         for (ChatClientListener l : listeners) l.onError(text);
     }
-
     private void fireWarn(String text) {
         for (ChatClientListener l : listeners) l.onWarn(text);
     }
-
     private void fireBanned(String reason) {
         for (ChatClientListener l : listeners) l.onBanned(reason);
     }
-
     private void fireConnectionClosed() {
         for (ChatClientListener l : listeners) l.onConnectionClosed();
     }
@@ -433,7 +416,6 @@ public class ChatClient {
             throw new IOException("Ungültiger Dateiname (Path Traversal)");
         }
 
-        // Falls Datei existiert: _1, _2, ...
         if (Files.exists(target)) {
             String base = filename;
             String ext = "";
@@ -478,6 +460,10 @@ public class ChatClient {
         }
 
         String filename = file.getFileName().toString();
+        if (!isAllowedUploadFilename(filename)) {
+            throw new IOException("Nur PDF- und Bilddateien erlaubt (.pdf, .png, .jpg, .jpeg)");
+        }
+
         long size = Files.size(file);
 
         if (size < 0 || size > MAX_FILE_BYTES) throw new IOException("Datei zu groß (max 50MB)");
@@ -514,11 +500,9 @@ public class ChatClient {
     private void fireFileList(String room, List<String> files) {
         for (ChatClientListener l : listeners) l.onFileList(room, files);
     }
-    private void fireFilesUpdated(String room, List<String> files) {
+    private void   fireFilesUpdated(String room, List<String> files) {
         for (ChatClientListener l : listeners) l.onFilesUpdated(room, files);
     }
-
-
 
     private boolean isValidFilename(String s) {
         if (s == null) return false;
@@ -530,7 +514,12 @@ public class ChatClient {
         return true;
     }
 
-
+    private boolean isAllowedUploadFilename(String filename) {
+        if (filename == null) return false;
+        String f = filename.toLowerCase();
+        return f.endsWith(".pdf") || f.endsWith(".png") || f.endsWith(".jpg")
+                || f.endsWith(".jpeg");
+    }
 }
 
 

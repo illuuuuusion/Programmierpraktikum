@@ -54,19 +54,15 @@ public class Config {
     public static String getServerHost() {
         return serverHost;
     }
-
     public static int getServerPort() {
         return serverPort;
     }
-
     public static String getUsersFile() {
         return usersFile;
     }
-
     public static int getPbkdf2Iterations() {
         return pbkdf2Iterations;
     }
-
     public static String getServerLogFile() {
         return serverLogFile;
     }

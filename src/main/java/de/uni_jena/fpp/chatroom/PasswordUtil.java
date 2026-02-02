@@ -17,7 +17,6 @@ public final class PasswordUtil {
     public static final int DEFAULT_ITERATIONS = 120_000;
     public static final int SALT_BYTES = 16;
     public static final int KEY_BITS = 256;
-
     private static final SecureRandom RNG = new SecureRandom();
 
     private PasswordUtil() {}
@@ -34,7 +33,6 @@ public final class PasswordUtil {
             SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             return skf.generateSecret(spec).getEncoded();
         } catch (GeneralSecurityException e) {
-            // Fallback (sollte selten nötig sein)
             try {
                 SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
                 return skf.generateSecret(spec).getEncoded();

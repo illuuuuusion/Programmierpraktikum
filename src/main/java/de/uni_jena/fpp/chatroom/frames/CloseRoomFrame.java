@@ -30,9 +30,9 @@ public class CloseRoomFrame extends MainFrame {
         btnConfirm.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                //  Raum verlassen (Server löscht ggf. Raum automatisch wenn leer)
+
                 if (client != null) {
-                    try { client.leave(); } catch (IOException ex) { /* optional MessageFrame */ }
+                    try { client.leave(); } catch (IOException ex) { /* opt.: MessageFrame */ }
                 }
                 frame.dispose();
 

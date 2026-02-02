@@ -22,25 +22,19 @@ public class ClientModel {
         filesInCurrentRoom.sort(String::compareToIgnoreCase);
     }
 
-    // Begrenzung, damit UI nicht unendlich wächst
     private int maxChatLines = 500;
-
     public synchronized List<String> getRooms() {
         return new ArrayList<>(rooms);
     }
-
     public synchronized String getCurrentRoom() {
         return currentRoom;
     }
-
     public synchronized List<String> getUsersInCurrentRoom() {
         return new ArrayList<>(usersInCurrentRoom);
     }
-
     public synchronized List<String> getChatLines() {
         return new ArrayList<>(chatLines);
     }
-
     public synchronized void setRooms(List<String> newRooms) {
         rooms.clear();
         if (newRooms != null) rooms.addAll(newRooms);
@@ -49,7 +43,6 @@ public class ClientModel {
 
     public synchronized void setCurrentRoom(String room) {
         this.currentRoom = room;
-        // wenn room gewechselt wird, kann UI users neu bekommen
         usersInCurrentRoom.clear();
         filesInCurrentRoom.clear();
     }
@@ -66,15 +59,5 @@ public class ClientModel {
         while (chatLines.size() > maxChatLines) {
             chatLines.remove(0);
         }
-    }
-
-    public synchronized void setMaxChatLines(int max) {
-        maxChatLines = Math.max(50, max);
-        while (chatLines.size() > maxChatLines) chatLines.remove(0);
-    }
-
-    // Für Debug/Tests: verhindert External modification
-    public synchronized List<String> getRoomsUnmodifiable() {
-        return Collections.unmodifiableList(new ArrayList<>(rooms));
     }
 }

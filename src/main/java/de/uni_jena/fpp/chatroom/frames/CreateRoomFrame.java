@@ -37,10 +37,9 @@ public class CreateRoomFrame extends MainFrame {
 
                 String roomName = tfRoomName.getText().trim();
 
-                // Minimal-Checks (Server prüft nochmal)
                 if (roomName.isEmpty() || roomName.equalsIgnoreCase("Name")) {
                     MessageFrame msgFrame = new MessageFrame();
-                    msgFrame.initialize(msgFrame, 2, 1); // "Invalider Raum Name."
+                    msgFrame.initialize(msgFrame, 2, 1);
                     return;
                 }
                 if (roomName.contains(" ") || roomName.contains("|")) {
@@ -51,23 +50,20 @@ public class CreateRoomFrame extends MainFrame {
 
                 if (client == null) {
                     MessageFrame msgFrame = new MessageFrame();
-                    msgFrame.initialize(msgFrame, 0, 0); // "Noch nicht implementiert."
+                    msgFrame.initialize(msgFrame, 0, 0);
                     return;
                 }
 
                 try {
                     client.createRoom(roomName);
 
-                    // Wir können nicht 100% sicher wissen ob ok, weil Server INFO/ERROR async schickt.
-                    // Für MVP: optimistisch -> Erfolgsmeldung + Fenster zu.
                     MessageFrame msgFrame = new MessageFrame();
-                    msgFrame.initialize(msgFrame, 2, 0); // "Raum erfolgreich erstellt."
+                    msgFrame.initialize(msgFrame, 2, 0);
                     frame.dispose();
 
                 } catch (IOException ex) {
-                    // Bei Send-Problemen -> Fehler
                     MessageFrame msgFrame = new MessageFrame();
-                    msgFrame.initialize(msgFrame, 2, 2); // "Raum Name existiert bereits." (oder allgemeiner fail)
+                    msgFrame.initialize(msgFrame, 2, 2);
                 }
             }
         });

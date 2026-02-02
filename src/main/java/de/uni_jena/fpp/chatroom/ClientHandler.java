@@ -10,8 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-
-
 public class ClientHandler extends Thread {
 
     private final ChatServer server;
@@ -81,7 +79,7 @@ public class ClientHandler extends Thread {
             case Protocol.CMD_JOIN -> handleJoin(tokens);
             case Protocol.CMD_LEAVE -> handleLeave();
 
-            // MS3: Dateien
+
             case Protocol.CMD_UPLOAD -> handleUpload(line);
             case Protocol.CMD_FILES -> handleFiles(tokens);
             case Protocol.CMD_DOWNLOAD -> handleDownload(tokens);
@@ -125,20 +123,18 @@ public class ClientHandler extends Thread {
             size = Long.parseLong(t[3]);
         } catch (NumberFormatException e) {
             send(Protocol.buildUploadFailed("INVALID_SIZE"));
-            closeNow(); // Protokoll kaputt -> lieber trennen
+            closeNow();
             return;
         }
 
-        // harte Grenze
         if (size < 0 || size > MAX_FILE_BYTES) {
             send(Protocol.buildUploadFailed("SIZE_LIMIT"));
-            closeNow(); // sonst müsste man ggf. endlos Bytes weglesen
+            closeNow();
             return;
         }
 
         if (currentRoom == null || !room.equals(currentRoom)) {
             send(Protocol.buildUploadFailed("NOT_IN_ROOM"));
-            // Bytes weglesen (safe, weil size <= MAX_FILE_BYTES)
             discardBytes(size);
             return;
         }
@@ -154,6 +150,12 @@ public class ClientHandler extends Thread {
             discardBytes(size);
             return;
         }
+        if (!isAllowedUploadFilename(filename)) {
+            send(Protocol.buildUploadFailed("TYPE_NOT_ALLOWED"));
+            discardBytes(size);
+            return;
+        }
+
 
         boolean ok = server.saveFileToRoom(room, filename, in, size);
 
@@ -166,6 +168,13 @@ public class ClientHandler extends Thread {
             closeNow();
         }
     }
+    private boolean isAllowedUploadFilename(String filename) {
+        if (filename == null) return false;
+        String f = filename.toLowerCase();
+        return f.endsWith(".pdf") || f.endsWith(".png") || f.endsWith(".jpg")
+                || f.endsWith(".jpeg");
+    }
+
 
     private void handleFiles(String[] tokens) throws IOException {
         if (!requireLogin()) return;
@@ -175,6 +184,7 @@ public class ClientHandler extends Thread {
             send(Protocol.RES_ERROR + " Usage: FILES <room>");
             return;
         }
+
 
         String room = tokens[1];
 
@@ -236,7 +246,6 @@ public class ClientHandler extends Thread {
     }
 
     private void sendFileBytes(Path file, String filename, long size) throws IOException {
-        // Wichtig: Header + Bytes müssen ohne Interleaving rausgehen.
         synchronized (this) {
             out.writeUTF(Protocol.buildFileHeader(filename, size));
             out.flush();
@@ -374,7 +383,7 @@ public class ClientHandler extends Thread {
     private void handleLeave() throws IOException {
         if (!requireLogin()) return;
 
-        // Immer zurück in Lobby
+
         boolean ok = server.joinRoom(ChatServer.DEFAULT_ROOM, this);
         if (ok) {
             send(Protocol.RES_INFO + " Joined " + ChatServer.DEFAULT_ROOM);

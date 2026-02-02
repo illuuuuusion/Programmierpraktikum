@@ -108,7 +108,7 @@ public class ServerFrame extends MainFrame {
 
         // --------------- Rechte Seite ---------------
         JPanel panel1 = new JPanel();
-        panel1.setLayout(new GridLayout(2, 1));
+        panel1.setLayout(new GridLayout(3, 1));
 
         // Räume
         // Räume
@@ -186,6 +186,85 @@ public class ServerFrame extends MainFrame {
 
         roomPanel.add(roomButtons, BorderLayout.SOUTH);
         panel1.add(roomPanel);
+        JPanel filePanel = new JPanel(new BorderLayout());
+        filePanel.setBorder(new TitledBorder("Dateien im Raum"));
+
+        DefaultListModel<String> serverFilesModel = new DefaultListModel<>();
+        JList<String> serverFilesList = new JList<>(serverFilesModel);
+        serverFilesList.setFont(mainFont);
+
+        filePanel.add(new JScrollPane(serverFilesList), BorderLayout.CENTER);
+
+        JPanel fileBtns = new JPanel(new GridLayout(1, 3, 5, 5));
+
+        JButton btnRefreshFiles = new JButton("Aktualisieren");
+        btnRefreshFiles.setFont(mainFont);
+
+        JButton btnDownloadFile = new JButton("Download");
+        btnDownloadFile.setFont(mainFont);
+
+        JButton btnDeleteFile = new JButton("Löschen");
+        btnDeleteFile.setFont(mainFont);
+
+        fileBtns.add(btnRefreshFiles);
+        fileBtns.add(btnDownloadFile);
+        fileBtns.add(btnDeleteFile);
+
+        filePanel.add(fileBtns, BorderLayout.SOUTH);
+        panel1.add(filePanel);
+        btnRefreshFiles.addActionListener(e -> {
+            String room = roomList.getSelectedValue();
+            if (room == null) return;
+            List<String> files = server.listFilesInRoom(room);
+            serverFilesModel.clear();
+            for (String f : files) serverFilesModel.addElement(f);
+        });
+
+        btnDeleteFile.addActionListener(e -> {
+            String room = roomList.getSelectedValue();
+            String file = serverFilesList.getSelectedValue();
+            if (room == null || file == null) return;
+
+            int confirm = JOptionPane.showConfirmDialog(
+                    frame,
+                    "Datei wirklich löschen?\n" + file,
+                    "Datei löschen",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE
+            );
+            if (confirm != JOptionPane.YES_OPTION) return;
+
+            boolean ok = server.deleteFileInRoom(room, file);
+            chatBox.append(ok ? "[INFO] Datei gelöscht: " + file + "\n"
+                    : "[ERROR] Löschen fehlgeschlagen.\n");
+
+            btnRefreshFiles.doClick();
+        });
+
+        btnDownloadFile.addActionListener(e -> {
+            String room = roomList.getSelectedValue();
+            String file = serverFilesList.getSelectedValue();
+            if (room == null || file == null) return;
+
+            java.nio.file.Path src = server.getRoomFilePath(room, file);
+            if (src == null || !java.nio.file.Files.exists(src)) {
+                chatBox.append("[ERROR] Datei nicht gefunden.\n");
+                return;
+            }
+
+            JFileChooser fc = new JFileChooser();
+            fc.setSelectedFile(new java.io.File(file));
+            int res = fc.showSaveDialog(frame);
+            if (res != JFileChooser.APPROVE_OPTION) return;
+
+            java.io.File dest = fc.getSelectedFile();
+            try {
+                java.nio.file.Files.copy(src, dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                chatBox.append("[INFO] Datei gespeichert: " + dest.getAbsolutePath() + "\n");
+            } catch (Exception ex) {
+                chatBox.append("[ERROR] Download fehlgeschlagen: " + ex.getMessage() + "\n");
+            }
+        });
 
 
         // Nutzer
@@ -216,7 +295,6 @@ public class ServerFrame extends MainFrame {
                     return;
                 }
 
-                // Anzeige ist z.B. "max | raum1" -> username extrahieren
                 String selected = lstUsers.getSelectedValue();
                 String username = selected.split("\\s*\\|\\s*", 2)[0];
 
@@ -234,7 +312,6 @@ public class ServerFrame extends MainFrame {
                 );
                 if (choice < 0 || choice == 2) return; // Fenster geschlossen oder Abbrechen
 
-
                 if (choice == 0) { // Warnen
                     String text = JOptionPane.showInputDialog(frame, "Warnungstext:", "Warnen", JOptionPane.PLAIN_MESSAGE);
                     if (text == null) return;
@@ -251,19 +328,15 @@ public class ServerFrame extends MainFrame {
             }
         });
 
-
         userPanel.add(pan);
         userPanel.add(btnKick);
-
         userPanelLayout.putConstraint(SpringLayout.NORTH, pan, 0, SpringLayout.NORTH, userPanel);
         userPanelLayout.putConstraint(SpringLayout.SOUTH, pan, -10, SpringLayout.NORTH, btnKick);
         userPanelLayout.putConstraint(SpringLayout.WEST, pan, 0, SpringLayout.WEST, userPanel);
         userPanelLayout.putConstraint(SpringLayout.EAST, pan, -5, SpringLayout.EAST, userPanel);
-
         userPanelLayout.putConstraint(SpringLayout.SOUTH, btnKick, 0, SpringLayout.SOUTH, userPanel);
         userPanelLayout.putConstraint(SpringLayout.WEST, btnKick, 0, SpringLayout.WEST, userPanel);
         userPanelLayout.putConstraint(SpringLayout.EAST, btnKick, 0, SpringLayout.EAST, userPanel);
-
         panel1.add(userPanel);
 
         // FINAL ADDING
@@ -282,14 +355,13 @@ public class ServerFrame extends MainFrame {
             chatBox.append("[WARN] ServerFrame ohne Server gestartet.\n");
         }
 
-        // Periodischer Refresh von Rooms/Users (einfach + robust)
         Timer refreshTimer = new Timer(1000, evt -> {
             if (server == null) return;
 
-            // Selection merken (Rooms)
+            // Selection merken
             String selectedRoom = roomList.getSelectedValue();
 
-            // Selection merken (Users) -> Username aus "name | room"
+            // Selection merken -> Username aus "name | room"
             String selectedUserLabel = lstUsers.getSelectedValue();
             String selectedUsername = null;
             if (selectedUserLabel != null) {

@@ -18,38 +18,74 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-
+import java.util.ArrayDeque;
 
 
 public class ChatServer {
 
     public static final String DEFAULT_ROOM = "Lobby";
-
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024; // 50 MB
     private final Path roomsBaseDir = Path.of("data", "rooms");
-
     private final int port;
     private final UserRepository userRepo;
-
     private volatile boolean running;
     private ServerSocket serverSocket;
-
     private final List<ClientHandler> connections = new CopyOnWriteArrayList<>();
     private final Map<String, ClientHandler> loggedInClients = new ConcurrentHashMap<>();
-
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
-
     private int nextClientId = 1;
     private final ServerLogger logger;
+    private static final int MAX_HISTORY_PER_ROOM = 200;
+    private static final class ChatEntry {
+        final String from;
+        final String text;
+        ChatEntry(String from, String text) {
+            this.from = from;
+            this.text = text;
+        }
+    }
 
+    private final Map<String, ArrayDeque<ChatEntry>> roomHistory = new ConcurrentHashMap<>();
 
+    private void ensureHistory(String room) {
+        if (room == null) return;
+        roomHistory.computeIfAbsent(room, r -> new ArrayDeque<>());
+    }
 
+    private void addHistory(String room, String from, String text) {
+        if (room == null) return;
+        ensureHistory(room);
+        ArrayDeque<ChatEntry> dq = roomHistory.get(room);
+        synchronized (dq) {
+            dq.addLast(new ChatEntry(from, text));
+            while (dq.size() > MAX_HISTORY_PER_ROOM) dq.removeFirst();
+        }
+    }
+
+    private List<ChatEntry> getHistorySnapshot(String room) {
+        ArrayDeque<ChatEntry> dq = roomHistory.get(room);
+        if (dq == null) return List.of();
+        synchronized (dq) {
+            return new ArrayList<>(dq);
+        }
+    }
+
+    private void sendHistoryTo(String room, ClientHandler handler) {
+        for (ChatEntry e : getHistorySnapshot(room)) {
+            try {
+                handler.send(Protocol.buildChat(room, e.from, e.text));
+            } catch (IOException ex) {
+                break;
+            }
+        }
+    }
 
     public ChatServer(int port, UserRepository userRepo, ServerLogger logger) {
         this.port = port;
         this.userRepo = userRepo;
         this.logger = logger;
         rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM, true));
+        ensureHistory(DEFAULT_ROOM);
         try {
             Files.createDirectories(roomsBaseDir);
         } catch (IOException e) {
@@ -97,8 +133,6 @@ public class ChatServer {
             logger.info("Server beendet.");
             System.out.println("[SERVER] Server beendet.");
 
-            // Logger schließen (Datei-Handle freigeben)
-
         }
     }
     public java.util.Map<String, String> getOnlineUserRooms() {
@@ -113,7 +147,6 @@ public class ChatServer {
         return running;
     }
 
-
     public void stop() {
         // Mehrfaches Stop ist ok
         if (!running) {
@@ -123,7 +156,6 @@ public class ChatServer {
         running = false;
         logger.info("Stop requested");
 
-        // 1) accept() beenden
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
@@ -132,7 +164,7 @@ public class ChatServer {
             logger.error("Fehler beim Schließen des ServerSocket: " + e.getMessage());
         }
 
-        // 2) ALLE Clients trennen, damit nichts mehr "weiterläuft"
+        // Clients trennen, damit nichts mehr weiterläuft
         for (ClientHandler ch : new ArrayList<>(connections)) {
             try {
                 ch.send(Protocol.RES_INFO + " Server wird beendet.");
@@ -140,18 +172,19 @@ public class ChatServer {
             ch.closeNow();
         }
 
-        // 3) Server-State zurücksetzen (optional, aber praktisch)
+        // Server-State zurücksetzen
         connections.clear();
         loggedInClients.clear();
 
         rooms.clear();
         rooms.putIfAbsent(DEFAULT_ROOM, new Room(DEFAULT_ROOM, true));
-
+        roomHistory.clear();
+        ensureHistory(DEFAULT_ROOM);
         logger.info("Stop komplett (clients geschlossen)");
     }
 
 
-    // ===== Schritt 2.3: Persistente Userverwaltung =====
+
 
     public boolean registerUser(String username, String password) {
         if (!isValidSimpleName(username) || password == null) return false;
@@ -163,10 +196,6 @@ public class ChatServer {
         }
     }
 
-    /**
-     * @return User record on success, otherwise null.
-     *         IMPORTANT: may return a banned user (user.isBanned()==true) if password matches.
-     */
     public User authenticateUser(String username, String password) {
         if (username == null || password == null) return null;
         char[] pw = password.toCharArray();
@@ -188,12 +217,7 @@ public class ChatServer {
     public boolean isUserLoggedIn(String username) {
         return loggedInClients.containsKey(username);
     }
-// ===== Schritt 2.4: Admin-Funktionen =====
 
-    /**
-     * Sends a warning to an ONLINE user.
-     * @return true if user was online and WARN was sent (best effort).
-     */
     public boolean warnUser(String username, String text) {
         if (username == null || username.isBlank()) return false;
         logger.warn("WARN user=" + username + " text=" + text);
@@ -213,24 +237,16 @@ public class ChatServer {
         }
     }
 
-    /**
-     * Permanently bans a user (persistent) and kicks them if online.
-     * @return true if the user existed in the repository and was persisted as banned.
-     */
     public boolean banUser(String username, String reason) {
         if (username == null || username.isBlank()) return false;
         logger.warn("BAN user=" + username + " reason=" + reason);
-
         boolean persisted = userRepo.setBanned(username, true);
 
         ClientHandler ch = loggedInClients.get(username);
         if (ch != null) {
             try {
                 ch.send(Protocol.buildBanned(reason == null ? "" : reason));
-            } catch (IOException ignore) {
-                // ignore, we kick anyway
-            }
-            // optional: sofort aus online-Liste nehmen (cleanup macht's nochmal)
+            } catch (IOException ignore) {}
             loggedInClients.remove(username);
             ch.closeNow();
         }
@@ -269,7 +285,6 @@ public class ChatServer {
     }
 
     // Rooms
-
     public List<String> getRoomNames() {
         List<String> list = new ArrayList<>(rooms.keySet());
         list.sort(String::compareToIgnoreCase);
@@ -282,35 +297,33 @@ public class ChatServer {
 
         Room existing = rooms.putIfAbsent(roomName, new Room(roomName));
         if (existing == null) {
+            ensureHistory(roomName);
             broadcastRoomListToAll();
             logger.info("ROOM_CREATE " + roomName);
             return true;
-
         }
         return false;
     }
 
     public boolean joinRoom(String roomName, ClientHandler handler) {
         if (!isValidRoomName(roomName)) return false;
-
         if (roomName.equals(handler.getCurrentRoom())) {
             return true;
         }
 
         leaveRoom(handler);
-
         Room target = rooms.get(roomName);
         if (target == null) return false;
-
         handler.setCurrentRoom(roomName);
         target.addMember(handler);
-
         broadcastRoomUsers(roomName);
+        sendHistoryTo(roomName, handler);
         return true;
     }
 
     public void leaveRoom(ClientHandler handler) {
         String old = handler.getCurrentRoom();
+
         if (old == null) return;
 
         Room room = rooms.get(old);
@@ -318,16 +331,14 @@ public class ChatServer {
 
         if (room != null) {
             room.removeMember(handler);
-
             broadcastRoomUsers(old);
-
             if (room.isEmpty() && !room.isPersistent() && !DEFAULT_ROOM.equals(old)) {
                 rooms.remove(old);
                 deleteRoomStorage(old);
                 broadcastRoomListToAll();
+                roomHistory.remove(old);
                 logger.info("ROOM_DELETE " + old);
             }
-
         }
     }
 
@@ -336,7 +347,6 @@ public class ChatServer {
     }
 
     // Push Updates
-
     public void sendRoomListTo(ClientHandler ch) {
         try {
             ch.send(Protocol.buildRoomList(getRoomNames()));
@@ -371,12 +381,12 @@ public class ChatServer {
     }
 
     // Chat in Room
-
     public void broadcastChatToRoom(String roomName, String from, String text) {
         Room room = rooms.get(roomName);
         if (room == null) return;
 
         String msg = Protocol.buildChat(roomName, from, text);
+        addHistory(roomName, from, text);
         for (ClientHandler member : room.getMembers()) {
             try {
                 member.send(msg);
@@ -391,6 +401,7 @@ public class ChatServer {
 
         Room existing = rooms.putIfAbsent(roomName, new Room(roomName, true));
         if (existing == null) {
+            ensureHistory(roomName);
             broadcastRoomListToAll();
             logger.info("ROOM_CREATE_ADMIN " + roomName);
             return true;
@@ -417,15 +428,12 @@ public class ChatServer {
 
         broadcastRoomListToAll();
         broadcastRoomUsers(DEFAULT_ROOM);
+        roomHistory.remove(roomName);
         logger.info("ROOM_DELETE_ADMIN " + roomName);
         return true;
     }
 
-
-
-
     // Validation Helpers
-
     private boolean isValidRoomName(String s) {
         if (!isValidSimpleName(s)) return false;
         return !s.contains("|");
@@ -442,12 +450,8 @@ public class ChatServer {
     }
 
     public void addLogListener(ServerLogListener l) { logger.addListener(l); }
-    public List<String> getLogHistory() { return logger.getHistorySnapshot(); }
     public void logInfo(String msg) { logger.info(msg); }
     public void logWarn(String msg) { logger.warn(msg); }
-    public void logError(String msg) { logger.error(msg); }
-
-// ===== MS3: Dateien =====
 
     public boolean roomExists(String room) {
         if (room == null) return false;
@@ -461,13 +465,9 @@ public class ChatServer {
 
     public Path getRoomFilePath(String room, String filename) {
         if (room == null || filename == null) return null;
-
         Path dir = roomDir(room);
         Path file = dir.resolve(filename).normalize();
-
-        // Safety: kein "../" aus dem base raus
         if (!file.startsWith(dir)) return null;
-
         return file;
     }
 
@@ -495,10 +495,21 @@ public class ChatServer {
         return out;
     }
 
-    /**
-     * Speichert genau <size> Bytes aus dem Client-Stream nach data/rooms/<room>/<filename>.
-     * Liest EXAKT size Bytes (sonst wäre der Stream danach kaputt).
-     */
+    public boolean deleteFileInRoom(String room, String filename) {
+        if (!roomExists(room)) return false;
+        if (!isValidFilename(filename)) return false;
+
+        Path file = getRoomFilePath(room, filename);
+        if (file == null) return false;
+
+        try {
+            return Files.deleteIfExists(file);
+        } catch (IOException e) {
+            logger.warn("FILE_DELETE_FAIL room=" + room + " file=" + filename + " err=" + e.getMessage());
+            return false;
+        }
+    }
+
     public boolean saveFileToRoom(String room, String filename, DataInputStream in, long size) {
         if (!roomExists(room)) return false;
         if (in == null) return false;
@@ -507,14 +518,11 @@ public class ChatServer {
 
         try {
             Files.createDirectories(roomsBaseDir);
-
             Path dir = roomDir(room);
             Files.createDirectories(dir);
-
             Path target = getRoomFilePath(room, filename);
             if (target == null) return false;
 
-            // temp schreiben und dann atomar ersetzen
             Path tmp = dir.resolve(filename + ".tmp").normalize();
             if (!tmp.startsWith(dir)) return false;
 
@@ -560,7 +568,6 @@ public class ChatServer {
         return true;
     }
 
-    // Optional: Room-Folder beim Room-Delete entfernen
     private void deleteRoomStorage(String roomName) {
         if (!isValidRoomName(roomName)) return;
         if (DEFAULT_ROOM.equals(roomName)) return;
@@ -578,5 +585,4 @@ public class ChatServer {
             logger.error("DELETE_ROOM_STORAGE_FAILED room=" + roomName + " err=" + e.getMessage());
         }
     }
-
 }

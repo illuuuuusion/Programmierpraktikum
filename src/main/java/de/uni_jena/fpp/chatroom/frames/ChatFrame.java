@@ -10,6 +10,10 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import javax.swing.border.EmptyBorder;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+
 
 public class ChatFrame extends MainFrame {
 
@@ -17,6 +21,7 @@ public class ChatFrame extends MainFrame {
 
     // FIX 1: filesModel deklarieren
     private final DefaultListModel<String> filesModel = new DefaultListModel<>();
+    private volatile String shownRoom = null;
 
     public ChatFrame() {
         this(null);
@@ -27,10 +32,10 @@ public class ChatFrame extends MainFrame {
     }
 
     public void initialize(JFrame frame) {
-        // FIX 3: frame konsequent verwenden
+        // FIX 3: frame verwenden
         frame.setSize(900, 500);
         frame.setLocation(750, 320);
-        frame.setTitle("Chat Client");
+        frame.setTitle("Chat Client - " + client.getUsername());
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.getContentPane().removeAll();
 
@@ -132,8 +137,6 @@ public class ChatFrame extends MainFrame {
                 }
 
                 client.join(room);
-                filesModel.clear();
-                client.listFiles(room);
                 chatPanel.setBorder(new TitledBorder(room));
                 chatPanel.revalidate();
                 chatPanel.repaint();
@@ -183,9 +186,44 @@ public class ChatFrame extends MainFrame {
         JList<String> lstFiles = new JList<>(filesModel);
         lstFiles.setFont(mainFont);
 
-        roomPanel5.add(new JScrollPane(lstFiles), BorderLayout.CENTER);
+        JScrollPane filesScroll = new JScrollPane(lstFiles);
+        filesScroll.setVisible(false);         // Start: unsichtbar
+        roomPanel5.add(filesScroll, BorderLayout.CENTER);
 
-        JPanel fileButtons = new JPanel(new GridLayout(2, 1));
+        JPanel fileButtons = new JPanel(new GridLayout(3, 1));
+        JToggleButton btnShowFiles = new JToggleButton("Dateien anzeigen");
+        btnShowFiles.setFont(mainFont);
+
+        btnShowFiles.addActionListener(e -> {
+            if (client == null) {
+                chatBox.append("[ERROR] Kein Client verbunden.\n");
+                return;
+            }
+
+            String room = client.getModel().getCurrentRoom();
+            if (room == null || room.isBlank()) {
+                chatBox.append("[ERROR] Kein aktueller Raum.\n");
+                btnShowFiles.setSelected(false);
+                return;
+            }
+
+            boolean show = btnShowFiles.isSelected();
+            filesScroll.setVisible(show);
+
+            if (show) {
+                filesModel.clear();
+                try {
+                    client.listFiles(room);
+                } catch (IOException ex) {
+                    chatBox.append("[ERROR] FILES: " + ex.getMessage() + "\n");
+                }
+            } else {
+                filesModel.clear();
+            }
+
+            roomPanel5.revalidate();
+            roomPanel5.repaint();
+        });
 
         JButton btnUpload = new JButton("Datei hochladen");
         btnUpload.setFont(mainFont);
@@ -213,7 +251,9 @@ public class ChatFrame extends MainFrame {
             new Thread(() -> {
                 try {
                     client.uploadFile(room, f.toPath());
-                    client.listFiles(room); // refresh
+                    if (btnShowFiles.isSelected()) {
+                        client.listFiles(room);
+                    }
                 } catch (IOException ex) {
                     SwingUtilities.invokeLater(() ->
                             chatBox.append("[ERROR] Upload: " + ex.getMessage() + "\n"));
@@ -254,7 +294,7 @@ public class ChatFrame extends MainFrame {
 
         fileButtons.add(btnUpload);
         fileButtons.add(btnDownload);
-
+        fileButtons.add(btnShowFiles);
         roomPanel5.add(fileButtons, BorderLayout.SOUTH);
 
         roomPanel3.add(users);
@@ -271,7 +311,7 @@ public class ChatFrame extends MainFrame {
         frame.getContentPane().add(mainPanel);
         frame.setVisible(true);
 
-        // Listener anbinden (Server -> UI Updates)
+        // Listener anbinden
         if (client != null) {
             client.addListener(new ChatClientListener() {
                 @Override
@@ -285,19 +325,33 @@ public class ChatFrame extends MainFrame {
                 @Override
                 public void onUsersUpdated(String room, List<String> users) {
                     SwingUtilities.invokeLater(() -> {
-                        // FIX 4: nur aktuellen Raum anzeigen (optional, aber korrekt)
                         String cur = client.getModel().getCurrentRoom();
                         if (cur == null || !cur.equals(room)) return;
+
+                        // Wenn der aktuell angezeigte Raum wechselt -> Chatfenster komplett leeren
+                        if (shownRoom == null || !shownRoom.equals(room)) {
+                            shownRoom = room;
+
+                            chatBox.setText("");
+                            chatBox.append("[INFO] Raum: " + room + "\n");
+                            chatBox.setCaretPosition(chatBox.getDocument().getLength());
+
+                            btnShowFiles.setSelected(false);
+                            filesScroll.setVisible(false);
+                            filesModel.clear();
+                            roomPanel5.revalidate();
+                            roomPanel5.repaint();
+                        }
 
                         usersModel.clear();
                         for (String u : users) usersModel.addElement(u);
                     });
                 }
 
+
                 @Override
                 public void onFileList(String room, List<String> files) {
                     SwingUtilities.invokeLater(() -> {
-                        // FIX 4: nur aktuellen Raum anzeigen (optional, aber korrekt)
                         String cur = client.getModel().getCurrentRoom();
                         if (cur == null || !cur.equals(room)) return;
 
@@ -309,10 +363,13 @@ public class ChatFrame extends MainFrame {
                 @Override
                 public void onChatMessage(String room, String from, String text) {
                     SwingUtilities.invokeLater(() -> {
-                        chatBox.append("[" + room + "][" + from + "] " + text + "\n");
+                        String cur = client.getModel().getCurrentRoom();
+                        if (cur == null || !cur.equals(room)) return;
+                        chatBox.append("[" + from + "] " + text + "\n");
                         chatBox.setCaretPosition(chatBox.getDocument().getLength());
                     });
                 }
+
 
                 @Override
                 public void onInfo(String text) {
@@ -327,8 +384,11 @@ public class ChatFrame extends MainFrame {
                     SwingUtilities.invokeLater(() -> {
                         chatBox.append("[WARN] " + text + "\n");
                         chatBox.setCaretPosition(chatBox.getDocument().getLength());
+
+                        showWarnDialog(frame, text);
                     });
                 }
+
 
                 @Override
                 public void onError(String text) {
@@ -357,13 +417,11 @@ public class ChatFrame extends MainFrame {
 
             roomsModel.clear();
             for (String r : client.getModel().getRooms()) roomsModel.addElement(r);
-// Nach Listener-Anbindung und initialem Model-Update:
             new Thread(() -> {
                 try {
                     String room = client.getModel().getCurrentRoom();
 
                     if (room == null || room.isBlank()) {
-                        // Lobby ermitteln (robust)
                         room = client.getModel().getRooms().stream()
                                 .filter(r -> r != null && r.equalsIgnoreCase("Lobby"))
                                 .findFirst()
@@ -377,16 +435,18 @@ public class ChatFrame extends MainFrame {
                                 chatBox.append("[ERROR] Kein initialer Raum gefunden.\n"));
                         return;
                     }
-
-                    // Join auslösen, damit currentRoom sauber gesetzt ist (auch wenn serverseitig schon Lobby)
                     client.join(room);
-
-                    // Files laden
-                    client.listFiles(room);
 
                     final String finalRoom = room;
                     SwingUtilities.invokeLater(() -> {
                         chatPanel.setBorder(new TitledBorder(finalRoom));
+                        SwingUtilities.invokeLater(() -> {
+                            btnShowFiles.setSelected(false);
+                            filesScroll.setVisible(false);
+                            filesModel.clear();
+                            roomPanel5.revalidate();
+                            roomPanel5.repaint();
+                        });
                         chatBox.append("[INFO] Initialer Raum: " + finalRoom + "\n");
                     });
 
@@ -402,6 +462,58 @@ public class ChatFrame extends MainFrame {
             chatBox.append("[WARN] ChatFrame ohne Client gestartet (nur UI Vorschau).\n");
         }
     }
+    private void showWarnDialog(JFrame parent, String reason) {
+        final JDialog dialog = new JDialog(parent, "Verwarnung", true);
+        dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+
+        dialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                Toolkit.getDefaultToolkit().beep();
+            }
+        });
+
+        JPanel root = new JPanel(new BorderLayout(10, 10));
+        root.setBorder(new EmptyBorder(12, 12, 12, 12));
+
+        // Kopfzeile mit Icon
+        JLabel header = new JLabel("Du wurdest vom Server verwarnt.");
+        header.setIcon(UIManager.getIcon("OptionPane.warningIcon"));
+        header.setFont(header.getFont().deriveFont(Font.BOLD, 15f));
+
+        JLabel lblReason = new JLabel("Verwarngrund:");
+        lblReason.setFont(lblReason.getFont().deriveFont(Font.BOLD));
+
+        JTextArea ta = new JTextArea(reason == null ? "" : reason);
+        ta.setEditable(false);
+        ta.setLineWrap(true);
+        ta.setWrapStyleWord(true);
+
+        JScrollPane sp = new JScrollPane(ta);
+        sp.setPreferredSize(new Dimension(420, 140));
+
+        JButton ok = new JButton("OK");
+        ok.addActionListener(e -> dialog.dispose());
+
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        bottom.add(ok);
+
+        JPanel center = new JPanel(new BorderLayout(6, 6));
+        center.add(lblReason, BorderLayout.NORTH);
+        center.add(sp, BorderLayout.CENTER);
+
+        root.add(header, BorderLayout.NORTH);
+        root.add(center, BorderLayout.CENTER);
+        root.add(bottom, BorderLayout.SOUTH);
+
+        dialog.setContentPane(root);
+        dialog.pack();
+        dialog.setLocationRelativeTo(parent);
+        dialog.setAlwaysOnTop(true);
+        dialog.setVisible(true);
+    }
+
+
 
     public static void main(String[] args) {
         ChatFrame chatFrame = new ChatFrame();

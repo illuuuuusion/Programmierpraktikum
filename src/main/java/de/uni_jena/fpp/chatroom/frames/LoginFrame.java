@@ -158,7 +158,7 @@ public class LoginFrame extends MainFrame {
 
             @Override
             public void onInfo(String text) {
-                // Kommt aus Netzwerk-Thread -> UI Thread!
+                // Kommt aus Netzwerk-Thread -> UI Thread
                 SwingUtilities.invokeLater(() -> {
                     if (text == null) return;
 
@@ -196,8 +196,6 @@ public class LoginFrame extends MainFrame {
                         return;
                     }
 
-                    // Optional: Status oben anzeigen
-                    // lbWelcome.setText(text);
                 });
             }
 

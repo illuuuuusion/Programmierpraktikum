@@ -1,6 +1,11 @@
 # username;iterations;saltBase64;hashBase64;banned
+334;120000;8HCSWh0E1Gi7NFzjWEggbA==;ibKHhaQEItGUWqrjw6XbKAEzm+78XesNctj7aSX+DB4=;false
 hali;120000;npGc7yKQHxBtGEzFd7KaCw==;jHaRPjut/17YnAByj3crLAnMVJAD14Qnpe852mEX6zU=;false
 hallo187;120000;FrATNqvcBa+nqE6Buu8gEg==;WpsQEagvpkubTxnduMlD8ZLCU10HQNeR9uKRz9ZgFH8=;false
+oki;120000;Aw0snQRe+tTpJ+3F0nCtZg==;KuqRg7UIiksnmSlubVwuougVhgVKvzDNEe+xzGvQHu4=;true
+okok;120000;8nl81aTObg+1aInQvYnDow==;RzDqpQMOrH9uP6FNgcGyTITOtdQr9VjO+uHHoynnAHY=;false
+testuser1;120000;/QCE36BfoHg9rT5sw274sg==;pR/6e9AdTSszSwMQLqzWrSso9WVZe7DmXakD0e1FT3U=;false
+testuser2;120000;ACrliyqhGzfrKIbeR5Kgwg==;bHioH/+my3nAbyLzn11BjmLBfpkQd3PUW69ytleA0o8=;false
 user1;120000;48gLTQ95lyKQ6/V4Q4wz/A==;b0VHKV0zIUgWjTGuuxqrrnh80NgvZZpdGXu5Lj+bPQ0=;true
 user2;120000;KHWfm2lTq96tB/YB3gQQkQ==;Hfs4N3VUNs14Uzy4TRFaH87kbnxl6twy47K9UyjL1ZU=;false
 user4;120000;m0on0Zm4QgfhYmjhcITRww==;NMVVSFIO1zgCPq3rnkNzDUgDkwSykEc8cEahzlSMNY0=;true

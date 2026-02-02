@@ -18,12 +18,9 @@ public class ServerLogger implements AutoCloseable {
 
     private final Path logFile;
     private final BufferedWriter writer;
-
     private final List<ServerLogListener> listeners = new CopyOnWriteArrayList<>();
-
     private final Deque<String> history = new ArrayDeque<>();
     private final int maxHistory;
-
     private final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ServerLogger(String filePath) throws IOException {
@@ -50,15 +47,6 @@ public class ServerLogger implements AutoCloseable {
     public void addListener(ServerLogListener l) {
         if (l != null) listeners.add(l);
     }
-
-    public void removeListener(ServerLogListener l) {
-        listeners.remove(l);
-    }
-
-    public synchronized List<String> getHistorySnapshot() {
-        return new ArrayList<>(history);
-    }
-
     public void info(String msg) { log("INFO", msg); }
     public void warn(String msg) { log("WARN", msg); }
     public void error(String msg) { log("ERROR", msg); }

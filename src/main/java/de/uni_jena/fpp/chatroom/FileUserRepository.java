@@ -19,7 +19,6 @@ public class FileUserRepository implements UserRepository {
 
     private final Path file;
     private final int defaultIterations;
-
     private final Map<String, User> users = new ConcurrentHashMap<>();
 
     public FileUserRepository(String filePath, int defaultIterations) {

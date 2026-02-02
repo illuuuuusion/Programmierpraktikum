@@ -18,7 +18,6 @@ public class GuiServerMain {
         ServerLogger logger = new ServerLogger(Config.getServerLogFile());
         ChatServer server = new ChatServer(port, repo, logger);
 
-        // optional: sauber schließen beim Beenden
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try { server.stop(); } catch (Exception ignore) {}
             try { logger.close(); } catch (Exception ignore) {}
