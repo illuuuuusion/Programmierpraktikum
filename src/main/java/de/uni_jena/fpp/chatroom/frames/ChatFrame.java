@@ -23,6 +23,7 @@ public class ChatFrame extends MainFrame {
     private final DefaultListModel<String> filesModel = new DefaultListModel<>();
     private volatile String shownRoom = null;
 
+
     public ChatFrame() {
         this(null);
     }

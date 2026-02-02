@@ -393,15 +393,19 @@ public class ChatClient {
     private void fireInfo(String text) {
         for (ChatClientListener l : listeners) l.onInfo(text);
     }
+
     private void fireError(String text) {
         for (ChatClientListener l : listeners) l.onError(text);
     }
+
     private void fireWarn(String text) {
         for (ChatClientListener l : listeners) l.onWarn(text);
     }
+
     private void fireBanned(String reason) {
         for (ChatClientListener l : listeners) l.onBanned(reason);
     }
+
     private void fireConnectionClosed() {
         for (ChatClientListener l : listeners) l.onConnectionClosed();
     }
@@ -416,6 +420,7 @@ public class ChatClient {
             throw new IOException("Ungültiger Dateiname (Path Traversal)");
         }
 
+        // Falls Datei existiert: _1, _2, ...
         if (Files.exists(target)) {
             String base = filename;
             String ext = "";
@@ -504,6 +509,8 @@ public class ChatClient {
         for (ChatClientListener l : listeners) l.onFilesUpdated(room, files);
     }
 
+
+
     private boolean isValidFilename(String s) {
         if (s == null) return false;
         if (s.isBlank()) return false;
@@ -520,6 +527,8 @@ public class ChatClient {
         return f.endsWith(".pdf") || f.endsWith(".png") || f.endsWith(".jpg")
                 || f.endsWith(".jpeg");
     }
+
+
 }
 
 
