@@ -1,0 +1,10 @@
+2026-02-02 06:33:54 [INFO] Server startet (Multi-Client) auf Port 5001
+2026-02-02 06:33:54 [INFO] Warte auf eingehende Clients ...
+2026-02-02 06:34:02 [INFO] CONNECT id=1 addr=/127.0.0.1:65213
+2026-02-02 06:34:11 [INFO] LOGIN_FAIL user=test1
+2026-02-02 06:34:14 [INFO] REGISTER user=test1 ok=true
+2026-02-02 06:34:15 [INFO] LOGIN_OK user=test1
+2026-02-02 06:37:40 [INFO] Stop requested
+2026-02-02 06:37:40 [INFO] ServerSocket geschlossen (stop).
+2026-02-02 06:37:40 [INFO] Server beendet.
+2026-02-02 06:37:40 [INFO] Stop komplett (clients geschlossen)
